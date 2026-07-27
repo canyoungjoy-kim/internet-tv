@@ -1,0 +1,20 @@
+{
+  "name": "운서역더타임 인터넷·TV 장비교체",
+  "short_name": "장비교체",
+  "description": "인터넷 공유기·셋톱박스 교체 작업 관리",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f766e",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%230f766e'/%3E%3Ctext x='256' y='345' text-anchor='middle' font-size='290' font-family='Apple Color Emoji%2CSegoe UI Emoji%2CNoto Color Emoji%2Csans-serif'%3E%F0%9F%93%A1%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

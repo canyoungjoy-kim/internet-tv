@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0f766e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>인터넷·TV 장비교체 방문 예약</title>
+<script src="fbconfig.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --primary:#0f766e;--primary-light:#ccfbf1;--primary-dark:#115e59;
+  --bg:#f1f5f9;--card:#fff;--border:#e2e8f0;
+  --text:#1e293b;--muted:#64748b;
+  --red:#ef4444;--red-bg:#fee2e2;
+  --yellow-bg:#fef3c7;--yellow-br:#fcd34d;--yellow-tx:#92400e;
+  --green:#16a34a;--green-bg:#dcfce7;
+  --blue-bg:#dbeafe;--blue-br:#93c5fd;--blue-tx:#1e40af;
+}
+html,body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:520px;margin:0 auto;padding:0 0 40px}
+header{background:var(--primary);color:#fff;padding:22px 18px 20px;text-align:center}
+header .site{font-size:14px;opacity:.85;font-weight:600}
+header h1{font-size:22px;font-weight:800;margin-top:5px;line-height:1.35}
+header .sub{font-size:14px;opacity:.9;margin-top:7px}
+
+.step{background:var(--card);margin:12px;border-radius:14px;border:1px solid var(--border);overflow:hidden}
+.step-head{padding:13px 16px;border-bottom:1px solid var(--border);background:#f8fafc;font-size:15px;font-weight:800;color:var(--muted);display:flex;align-items:center;gap:8px}
+.step-head .n{background:var(--primary);color:#fff;width:23px;height:23px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.step-body{padding:16px;display:flex;flex-direction:column;gap:14px}
+
+label.fl{font-size:15px;font-weight:700;color:var(--muted);display:block;margin-bottom:5px}
+input,select,textarea{width:100%;padding:14px 14px;border:2px solid var(--border);border-radius:11px;font-size:18px;font-family:inherit;outline:none;background:#fff;color:var(--text);-webkit-appearance:none;appearance:none}
+input:focus,select:focus,textarea:focus{border-color:var(--primary)}
+textarea{resize:vertical;min-height:74px;font-size:16px}
+
+.btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:16px;border-radius:12px;border:none;font-size:18px;font-weight:800;cursor:pointer;font-family:inherit}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-outline{background:#fff;color:var(--text);border:2px solid var(--border)}
+.btn:disabled{opacity:.45;pointer-events:none}
+
+.notice{background:var(--yellow-bg);border:1.5px solid var(--yellow-br);color:var(--yellow-tx);padding:14px 15px;border-radius:11px;font-size:15.5px;font-weight:600}
+.notice strong{font-weight:800}
+.notice ul{margin:7px 0 0 18px}
+.notice li{margin-bottom:5px}
+.info{background:var(--blue-bg);border:1.5px solid var(--blue-br);color:var(--blue-tx);padding:13px 15px;border-radius:11px;font-size:15px;font-weight:600}
+.err{background:var(--red-bg);border:1.5px solid #fca5a5;color:#991b1b;padding:13px 15px;border-radius:11px;font-size:15px;font-weight:700}
+.ok-box{background:var(--green-bg);border:1.5px solid #86efac;color:#166534;padding:16px;border-radius:12px;text-align:center}
+.ok-box .big{font-size:22px;font-weight:800;margin:6px 0}
+
+.pick{display:grid;grid-template-columns:1fr;gap:9px}
+.pick-btn{padding:15px 14px;border:2px solid var(--border);border-radius:12px;background:#fff;font-size:17px;font-weight:700;cursor:pointer;text-align:left;line-height:1.45;color:var(--text)}
+.pick-btn .d{font-size:13.5px;font-weight:600;color:var(--muted);margin-top:3px}
+.pick-btn.on{border-color:var(--primary);background:var(--primary-light)}
+.pick-btn.on .d{color:var(--primary-dark)}
+
+.days{display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:8px}
+.day-btn{padding:12px 4px;border:2px solid var(--border);border-radius:12px;background:#fff;cursor:pointer;text-align:center}
+.day-btn .dd{font-size:19px;font-weight:800;line-height:1.1}
+.day-btn .dw{font-size:13px;font-weight:700;color:var(--muted);margin-top:2px}
+.day-btn.on{border-color:var(--primary);background:var(--primary-light)}
+.day-btn.on .dw{color:var(--primary-dark)}
+.day-btn.we .dw{color:#dc2626}
+
+.slots{display:grid;grid-template-columns:1fr;gap:8px}
+.slot-btn{padding:14px 15px;border:2px solid var(--border);border-radius:12px;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:18px;font-weight:800;color:var(--text)}
+.slot-btn .left{text-align:left}
+.slot-btn .rest{font-size:14px;font-weight:700;color:var(--green)}
+.slot-btn.on{border-color:var(--primary);background:var(--primary-light)}
+.slot-btn.full{opacity:.5;pointer-events:none;background:#f8fafc}
+.slot-btn.full .rest{color:var(--red)}
+
+.hide{display:none!important}
+.center{text-align:center}
+.muted{color:var(--muted);font-size:14px}
+.spin{display:inline-block;width:17px;height:17px;border:3px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-3px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.load{text-align:center;padding:60px 20px;color:var(--muted);font-size:16px}
+footer{text-align:center;padding:20px 18px;color:var(--muted);font-size:13.5px;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="site" id="hSite">운서역더타임</div>
+    <h1>인터넷·TV 장비교체<br>방문 예약</h1>
+    <div class="sub">인터넷 공유기 · 셋톱박스 교체</div>
+  </header>
+
+  <div id="loading" class="load">불러오는 중…</div>
+
+  <div id="closedBox" class="step hide">
+    <div class="step-body">
+      <div class="notice center" style="font-size:17px">
+        현재 <strong>온라인 예약 접수가 마감</strong>되었습니다.<br>
+        관리사무소로 문의해 주세요.
+      </div>
+    </div>
+  </div>
+
+  <div id="mainFlow" class="hide">
+
+    <!-- 안내 -->
+    <div class="step">
+      <div class="step-head"><span class="n">!</span>꼭 읽어주세요</div>
+      <div class="step-body">
+        <div class="notice">
+          <strong>예약하신 시간에 반드시 세대 내에 계셔야 합니다.</strong>
+          <ul>
+            <li>작업 시간은 세대당 약 <strong>20~30분</strong> 소요됩니다.</li>
+            <li>기존 <strong>인터넷 공유기·셋톱박스를 회수</strong>하고 새 장비로 교체합니다. 기존 장비와 <strong>리모컨·전원 어댑터</strong>를 미리 챙겨두시면 빠릅니다.</li>
+            <li>부재 시 작업이 불가하며, 재방문 일정을 다시 잡으셔야 합니다.</li>
+          </ul>
+        </div>
+        <div class="info">
+          <strong>부득이하게 자리를 비우셔야 한다면</strong><br>
+          현관 도어락에 <strong>임시 비밀번호</strong>를 만들어 두시고, 아래 예약에서 그 번호를 남겨주세요.
+          작업이 끝나면 저장된 번호는 <strong>바로 삭제</strong>되며, 작업 후 <strong>반드시 임시 비밀번호를 지워주시기 바랍니다.</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. 본인 확인 -->
+    <div class="step" id="stepVerify">
+      <div class="step-head"><span class="n">1</span>본인 확인</div>
+      <div class="step-body">
+        <div>
+          <label class="fl">호실 번호</label>
+          <input type="tel" id="inHo" inputmode="numeric" placeholder="예) 512" maxlength="5" autocomplete="off">
+        </div>
+        <div>
+          <label class="fl">연락처 뒷 4자리</label>
+          <input type="tel" id="inPh4" inputmode="numeric" placeholder="예) 1234" maxlength="4" autocomplete="off">
+          <div class="muted" style="margin-top:5px">관리사무소에 등록된 휴대전화 뒷 4자리입니다.</div>
+        </div>
+        <div id="vErr" class="err hide"></div>
+        <button class="btn btn-primary" id="btnVerify" onclick="doVerify()">확인</button>
+      </div>
+    </div>
+
+    <!-- 2. 재실 방법 -->
+    <div class="step hide" id="stepMode">
+      <div class="step-head"><span class="n">2</span>작업 시 재실 방법</div>
+      <div class="step-body">
+        <div class="pick" id="modePick">
+          <button class="pick-btn" data-v="day" onclick="pickMode(this)">
+            직접 집에 있겠습니다
+            <div class="d">예약한 시간에 세대에서 기사를 맞이합니다</div>
+          </button>
+          <button class="pick-btn" data-v="pin" onclick="pickMode(this)">
+            임시 비밀번호를 남기겠습니다
+            <div class="d">부재 중이라도 기사가 들어가 작업할 수 있습니다</div>
+          </button>
+        </div>
+        <div id="pinWrap" class="hide">
+          <label class="fl">현관 임시 비밀번호</label>
+          <input type="tel" id="inPin" inputmode="numeric" placeholder="예) 1234*" maxlength="12" autocomplete="off">
+          <div class="notice" style="margin-top:9px">
+            평소 쓰시던 비밀번호가 아닌 <strong>임시 번호</strong>를 만들어 알려주세요.
+            작업 완료 후 저장된 번호는 삭제되며, <strong>입주민께서도 임시 번호를 꼭 지워주세요.</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. 날짜 -->
+    <div class="step hide" id="stepDay">
+      <div class="step-head"><span class="n">3</span>날짜 선택</div>
+      <div class="step-body">
+        <div class="days" id="dayPick"></div>
+      </div>
+    </div>
+
+    <!-- 4. 시간 -->
+    <div class="step hide" id="stepSlot">
+      <div class="step-head"><span class="n">4</span>시간 선택</div>
+      <div class="step-body">
+        <div class="slots" id="slotPick"></div>
+      </div>
+    </div>
+
+    <!-- 5. 제출 -->
+    <div class="step hide" id="stepSubmit">
+      <div class="step-head"><span class="n">5</span>확인 후 신청</div>
+      <div class="step-body">
+        <div class="info" id="summary"></div>
+        <div>
+          <label class="fl">남기실 말씀 (선택)</label>
+          <textarea id="inNote" placeholder="예) 셋톱박스가 안방에 있습니다 / 벨이 고장났습니다"></textarea>
+        </div>
+        <div id="sErr" class="err hide"></div>
+        <button class="btn btn-primary" id="btnSubmit" onclick="doSubmit()">이 시간으로 예약 신청</button>
+      </div>
+    </div>
+
+    <!-- 완료 -->
+    <div class="step hide" id="stepDone">
+      <div class="step-head">예약 완료</div>
+      <div class="step-body">
+        <div class="ok-box">
+          <div style="font-size:38px">✅</div>
+          <div class="big" id="doneWhen"></div>
+          <div id="doneHo" style="font-weight:700"></div>
+          <div style="margin-top:9px;font-size:15px" id="doneMode"></div>
+        </div>
+        <div class="notice">예약하신 시간에 <strong>반드시 세대에 계셔야</strong> 작업이 가능합니다. 시간 변경이 필요하시면 아래 버튼을 눌러 다시 선택해 주세요.</div>
+        <button class="btn btn-outline" onclick="restart()">예약 시간 변경하기</button>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    문의 · 관리사무소<br>
+    입력하신 정보는 장비교체 작업에만 사용되며, 작업 종료 후 폐기됩니다.
+  </footer>
+</div>
+
+<script>
+const SITE_ID = 'unseo-thetime';
+const FB_VER = '10.12.2';
+const DOW = ['일','월','화','수','목','금','토'];
+
+let db = null, fbm = null;
+let pub = null;        // meta/public
+let avail = {};        // meta/avail counts
+let roster = {};       // meta/roster hashes
+let sel = { ho:'', ph4:'', mode:'', pin:'', date:'', slot:'' };
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function dowOf(d){ const x=new Date(d+'T00:00:00'); return isNaN(x)?'':DOW[x.getDay()]; }
+function isWeekend(d){ const x=new Date(d+'T00:00:00'); return !isNaN(x) && (x.getDay()===0||x.getDay()===6); }
+function fmtDate(d){ const p=d.split('-'); return `${Number(p[1])}월 ${Number(p[2])}일(${dowOf(d)})`; }
+function slotsFor(d){ if(!pub||!pub.slots) return []; return (isWeekend(d)?pub.slots.weekend:pub.slots.weekday)||[]; }
+function fmtTime(t){
+  const [h,m] = t.split(':').map(Number);
+  const ap = h<12 ? '오전' : '오후';
+  const hh = h===0?12 : (h>12?h-12:h);
+  return `${ap} ${hh}시${m?' '+m+'분':''}`;
+}
+async function sha256hex(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+/* ── Firebase 초기화 ── */
+async function boot(){
+  let cfg = window.ITTV_FIREBASE_CONFIG;
+  if(!cfg || !cfg.apiKey){
+    // fbconfig.js 가 아직 안 채워졌으면 관리자 기기의 저장값으로 대체 (사무소 확인용)
+    try{ cfg = JSON.parse(localStorage.getItem('ittv_fbconfig')||'null'); }catch(e){ cfg = null; }
+  }
+  if(!cfg || !cfg.apiKey){
+    $('loading').innerHTML = '예약 시스템이 아직 준비되지 않았습니다.<br>관리사무소로 문의해 주세요.';
+    return;
+  }
+  try{
+    const [{ initializeApp }, authMod, fsMod] = await Promise.all([
+      import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-app.js`),
+      import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-auth.js`),
+      import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-firestore.js`),
+    ]);
+    fbm = Object.assign({}, fsMod);
+    const app = initializeApp(cfg);
+    const auth = authMod.getAuth(app);
+    db = fsMod.getFirestore(app);
+    if(!auth.currentUser) await authMod.signInAnonymously(auth);
+
+    const { doc, getDoc } = fsMod;
+    const [pSnap, aSnap, rSnap] = await Promise.all([
+      getDoc(doc(db,'sites',SITE_ID,'meta','public')),
+      getDoc(doc(db,'sites',SITE_ID,'meta','avail')),
+      getDoc(doc(db,'sites',SITE_ID,'meta','roster')),
+    ]);
+    pub    = pSnap.exists() ? pSnap.data() : null;
+    avail  = aSnap.exists() ? (aSnap.data().counts||{}) : {};
+    roster = rSnap.exists() ? (rSnap.data().hashes||{}) : {};
+
+    $('loading').classList.add('hide');
+    if(!pub){
+      $('loading').classList.remove('hide');
+      $('loading').innerHTML = '예약 정보가 아직 등록되지 않았습니다.<br>관리사무소로 문의해 주세요.';
+      return;
+    }
+    if(pub.siteName) $('hSite').textContent = pub.siteName;
+    if(!pub.bookingOpen){ $('closedBox').classList.remove('hide'); return; }
+    $('mainFlow').classList.remove('hide');
+  }catch(e){
+    console.error(e);
+    $('loading').innerHTML = '연결에 실패했습니다.<br>잠시 후 다시 시도하거나 관리사무소로 문의해 주세요.<br><span style="font-size:12px">('+esc(e.message)+')</span>';
+  }
+}
+
+/* ── 1. 본인 확인 ── */
+async function doVerify(){
+  const ho  = $('inHo').value.trim().replace(/[^0-9]/g,'');
+  const ph4 = $('inPh4').value.trim().replace(/[^0-9]/g,'');
+  const err = $('vErr');
+  err.classList.add('hide');
+  const fail = m => { err.textContent = m; err.classList.remove('hide'); };
+
+  if(!ho) return fail('호실 번호를 입력해 주세요.');
+  if(!(ho in roster)) return fail(`${ho}호를 찾을 수 없습니다. 호실 번호를 다시 확인해 주세요.`);
+
+  const expect = roster[ho];
+  if(expect){
+    if(ph4.length !== 4) return fail('연락처 뒷 4자리를 입력해 주세요.');
+    const got = await sha256hex(`${SITE_ID}:${ho}:${ph4}`);
+    if(got !== expect) return fail('호실과 연락처가 일치하지 않습니다.\n관리사무소로 문의해 주세요.');
+  }
+  // 연락처 미등록 세대는 뒷4자리 확인 없이 통과 (입력값은 그대로 저장해 대조에 씁니다)
+
+  sel.ho = ho; sel.ph4 = ph4 || '0000';
+  $('stepVerify').classList.add('hide');
+  $('stepMode').classList.remove('hide');
+  $('stepMode').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+/* ── 2. 재실 방법 ── */
+function pickMode(btn){
+  document.querySelectorAll('#modePick .pick-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  sel.mode = btn.dataset.v;
+  $('pinWrap').classList.toggle('hide', sel.mode!=='pin');
+  renderDays();
+  $('stepDay').classList.remove('hide');
+  setTimeout(()=>$('stepDay').scrollIntoView({behavior:'smooth', block:'start'}), 80);
+}
+
+/* ── 3. 날짜 ── */
+function renderDays(){
+  const days = (pub.days||[]).map(d=>d.date).filter(Boolean).sort();
+  $('dayPick').innerHTML = days.map(d=>`
+    <button class="day-btn ${isWeekend(d)?'we':''} ${sel.date===d?'on':''}" onclick="pickDay('${d}')">
+      <div class="dd">${Number(d.split('-')[2])}일</div>
+      <div class="dw">${dowOf(d)}요일</div>
+    </button>`).join('') || '<div class="muted">등록된 작업일이 없습니다</div>';
+}
+function pickDay(d){
+  sel.date = d; sel.slot = '';
+  renderDays(); renderSlots();
+  $('stepSlot').classList.remove('hide');
+  $('stepSubmit').classList.add('hide');
+  setTimeout(()=>$('stepSlot').scrollIntoView({behavior:'smooth', block:'start'}), 80);
+}
+
+/* ── 4. 시간 ── */
+function renderSlots(){
+  const list = slotsFor(sel.date);
+  if(!list.length){ $('slotPick').innerHTML = '<div class="muted">선택 가능한 시간이 없습니다</div>'; return; }
+  $('slotPick').innerHTML = list.map(s=>{
+    const used = avail[sel.date+'|'+s.id]||0;
+    const cap = Number(s.cap)||0;
+    const rest = cap - used;
+    const full = rest <= 0;
+    return `<button class="slot-btn ${full?'full':''} ${sel.slot===s.id?'on':''}" ${full?'disabled':''} onclick="pickSlot('${s.id}')">
+      <span class="left">${fmtTime(s.from)} ~ ${fmtTime(s.to)}</span>
+      <span class="rest">${full?'마감':'예약 가능'}</span>
+    </button>`;
+  }).join('');
+}
+function pickSlot(id){
+  sel.slot = id;
+  renderSlots();
+  const s = slotsFor(sel.date).find(x=>x.id===id);
+  $('summary').innerHTML = `
+    <div style="font-size:19px;font-weight:800;margin-bottom:5px">${esc(sel.ho)}호</div>
+    <div style="font-size:19px;font-weight:800">${fmtDate(sel.date)} ${fmtTime(s.from)} ~ ${fmtTime(s.to)}</div>
+    <div style="margin-top:7px">${sel.mode==='pin' ? '임시 비밀번호를 남기고 부재' : '세대에 직접 계심'}</div>`;
+  $('stepSubmit').classList.remove('hide');
+  setTimeout(()=>$('stepSubmit').scrollIntoView({behavior:'smooth', block:'start'}), 80);
+}
+
+/* ── 5. 제출 ── */
+async function doSubmit(){
+  const err = $('sErr'); err.classList.add('hide');
+  const fail = m => { err.textContent = m; err.classList.remove('hide'); };
+  if(!sel.date || !sel.slot) return fail('날짜와 시간을 선택해 주세요.');
+  if(sel.mode==='pin'){
+    const pin = $('inPin').value.trim();
+    if(!pin) return fail('임시 비밀번호를 입력하시거나, 직접 재실하시는 것으로 변경해 주세요.');
+    sel.pin = pin;
+  } else sel.pin = '';
+
+  const btn = $('btnSubmit');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> 신청 중…';
+  try{
+    const { doc, setDoc, getDoc } = fbm;
+
+    // 제출 직전 잔여 확인 (다른 분이 먼저 예약했을 수 있음)
+    const aSnap = await getDoc(doc(db,'sites',SITE_ID,'meta','avail'));
+    if(aSnap.exists()) avail = aSnap.data().counts||{};
+    const s = slotsFor(sel.date).find(x=>x.id===sel.slot);
+    if(s && (avail[sel.date+'|'+sel.slot]||0) >= (Number(s.cap)||0)){
+      renderSlots();
+      throw new Error('방금 그 시간대가 마감되었습니다. 다른 시간을 선택해 주세요.');
+    }
+
+    const id = `${sel.ho}_${sel.ph4}`;
+    await setDoc(doc(db,'sites',SITE_ID,'bookings',id), {
+      ho: sel.ho,
+      phone4: sel.ph4,
+      date: sel.date,
+      slot: sel.slot,
+      presence: sel.mode==='pin' ? 'pin' : 'day',
+      pin: sel.pin,
+      note: $('inNote').value.trim(),
+      at: Date.now(),
+      ua: navigator.userAgent.slice(0,120),
+    });
+
+    // 낙관적 반영 (다음 방문자가 대략적인 잔여를 보도록)
+    avail[sel.date+'|'+sel.slot] = (avail[sel.date+'|'+sel.slot]||0) + 1;
+
+    const sl = slotsFor(sel.date).find(x=>x.id===sel.slot);
+    $('doneWhen').textContent = `${fmtDate(sel.date)}\n${fmtTime(sl.from)} ~ ${fmtTime(sl.to)}`;
+    $('doneWhen').style.whiteSpace = 'pre-line';
+    $('doneHo').textContent = `${sel.ho}호`;
+    $('doneMode').textContent = sel.mode==='pin'
+      ? '임시 비밀번호를 남기신 것으로 접수되었습니다.\n작업 후 반드시 임시 번호를 삭제해 주세요.'
+      : '예약 시간에 세대에 계셔야 작업이 가능합니다.';
+    $('doneMode').style.whiteSpace = 'pre-line';
+
+    ['stepMode','stepDay','stepSlot','stepSubmit'].forEach(x=>$(x).classList.add('hide'));
+    $('stepDone').classList.remove('hide');
+    window.scrollTo({top:0, behavior:'smooth'});
+  }catch(e){
+    fail(e.message || '신청에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+  }
+  btn.disabled = false; btn.textContent = '이 시간으로 예약 신청';
+}
+
+function restart(){
+  sel.date=''; sel.slot='';
+  $('stepDone').classList.add('hide');
+  $('stepMode').classList.remove('hide');
+  renderDays();
+  $('stepDay').classList.remove('hide');
+  $('stepSlot').classList.add('hide');
+  $('stepSubmit').classList.add('hide');
+  $('stepMode').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+$('inHo').addEventListener('keydown', e=>{ if(e.key==='Enter') $('inPh4').focus(); });
+$('inPh4').addEventListener('keydown', e=>{ if(e.key==='Enter') doVerify(); });
+
+boot();
+</script>
+</body>
+</html>

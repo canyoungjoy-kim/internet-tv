@@ -1,0 +1,1828 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0f766e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="장비교체">
+<link rel="manifest" href="manifest.json">
+<title>인터넷·TV 장비교체 관리</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --primary:#0f766e;--primary-light:#ccfbf1;--primary-dark:#115e59;
+  --bg:#f8fafc;--card:#fff;--border:#e2e8f0;
+  --text:#1e293b;--muted:#64748b;
+  --red:#ef4444;--red-bg:#fee2e2;
+  --orange:#ea580c;--orange-bg:#ffedd5;
+  --yellow:#f59e0b;--yellow-bg:#fef3c7;
+  --green:#16a34a;--green-bg:#dcfce7;
+  --blue:#2563eb;--blue-bg:#dbeafe;
+  --purple:#7c3aed;--purple-bg:#ede9fe;
+  --radius:12px;
+}
+html,body{height:100%;font-family:'Apple SD Gothic Neo','Noto Sans KR','Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:15px;-webkit-font-smoothing:antialiased}
+#app{display:flex;flex-direction:column;height:100%;height:100dvh}
+header{background:var(--primary);color:#fff;padding:0 12px;display:flex;align-items:center;height:52px;gap:8px;flex-shrink:0}
+header h1{font-size:16px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr-btn{background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.hdr-btn:active{background:rgba(255,255,255,.34)}
+#mainContent{flex:1;overflow-y:auto;padding-bottom:76px;-webkit-overflow-scrolling:touch}
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);display:flex;z-index:50;height:58px;padding-bottom:env(safe-area-inset-bottom)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11px;font-weight:600;color:var(--muted);border:none;background:none;cursor:pointer;padding:4px 0;min-height:44px}
+.nav-item .ico{font-size:19px;line-height:1}
+.nav-item.active{color:var(--primary)}
+.view{display:none;padding:12px}
+.view.active{display:block}
+
+.card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:10px;overflow:hidden}
+.sec{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:10px;overflow:hidden}
+.sec-title{padding:10px 13px;font-size:12px;font-weight:800;color:var(--muted);border-bottom:1px solid var(--border);background:#f8fafc;letter-spacing:.4px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.sec-body{padding:13px;display:flex;flex-direction:column;gap:11px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg label{font-size:12px;font-weight:700;color:var(--muted)}
+input,select,textarea{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;font-family:inherit;outline:none;background:#fff;color:var(--text);-webkit-appearance:none;appearance:none}
+input:focus,select:focus,textarea:focus{border-color:var(--primary)}
+textarea{resize:vertical;min-height:70px;line-height:1.6}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+input[type=checkbox]{width:auto;-webkit-appearance:checkbox;appearance:checkbox}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:11px 16px;border-radius:10px;border:none;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-outline{background:#fff;color:var(--text);border:1.5px solid var(--border)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-full{width:100%}
+.btn-sm{padding:7px 12px;font-size:13px;border-radius:8px;min-height:36px}
+.btn:disabled{opacity:.45;pointer-events:none}
+
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.stat-card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);padding:12px 6px;text-align:center;cursor:pointer}
+.stat-card:active{transform:scale(.97)}
+.stat-card.active{border-color:var(--primary);background:var(--primary-light)}
+.stat-num{font-size:26px;font-weight:800;line-height:1.15}
+.stat-label{font-size:13px;color:var(--muted);margin-top:2px;font-weight:700}
+
+.progress-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px}
+.progress-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px}
+.progress-pct{font-size:30px;font-weight:800;color:var(--primary)}
+.progress-sub{font-size:13px;color:var(--muted);font-weight:600}
+.pbar{height:14px;border-radius:8px;background:#e2e8f0;overflow:hidden;display:flex}
+.pbar span{display:block;height:100%}
+
+.chips{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;margin-bottom:11px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;padding:8px 15px;border-radius:22px;border:1.5px solid var(--border);background:#fff;font-size:15px;font-weight:700;color:var(--muted);cursor:pointer;white-space:nowrap}
+.chip.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+.floor-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(66px,1fr));gap:6px}
+.unit-tile{border:1.5px solid var(--border);border-radius:9px;padding:7px 3px 6px;text-align:center;cursor:pointer;background:#fff;position:relative;min-height:56px;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.unit-tile:active{transform:scale(.95)}
+.unit-tile .u-ho{font-size:16px;font-weight:800;line-height:1}
+.unit-tile .u-sub{font-size:10px;font-weight:700;line-height:1.15;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
+.unit-tile .u-dot{position:absolute;top:4px;right:4px;font-size:9px}
+.st-todo{background:#fff;border-color:#e2e8f0;color:#475569}
+.st-contacted{background:var(--yellow-bg);border-color:#fcd34d;color:#92400e}
+.st-booked{background:var(--blue-bg);border-color:#93c5fd;color:#1e40af}
+.st-done{background:var(--green-bg);border-color:#86efac;color:#166534}
+.st-absent{background:var(--orange-bg);border-color:#fdba74;color:#9a3412}
+.st-hold{background:var(--red-bg);border-color:#fca5a5;color:#991b1b}
+.st-vacant{background:#f1f5f9;border-color:#e2e8f0;color:#94a3b8}
+
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;font-size:12px;font-weight:700;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:4px;border:1.5px solid;margin-right:4px;vertical-align:-1px}
+
+.ulist-item{display:flex;align-items:center;gap:10px;padding:11px 12px;border-bottom:1px solid var(--border);cursor:pointer;background:#fff}
+.ulist-item:last-child{border-bottom:none}
+.ulist-item:active{background:#f8fafc}
+.ul-ho{font-size:17px;font-weight:800;min-width:52px}
+.ul-mid{flex:1;min-width:0}
+.ul-name{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ul-meta{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge{padding:4px 10px;border-radius:20px;font-size:12px;font-weight:800;white-space:nowrap;border:1.5px solid}
+
+.modal{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:100;display:none;align-items:flex-end;justify-content:center}
+.modal.open{display:flex}
+.modal-box{background:var(--bg);width:100%;max-width:560px;max-height:92dvh;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden}
+.modal-head{background:var(--card);padding:13px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
+.modal-head h2{font-size:19px;font-weight:800;flex:1}
+.modal-body{overflow-y:auto;padding:12px;flex:1}
+.modal-foot{background:var(--card);border-top:1px solid var(--border);padding:10px 12px;display:flex;gap:8px;flex-shrink:0;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+.x-btn{background:#f1f5f9;border:none;border-radius:8px;width:34px;height:34px;font-size:19px;cursor:pointer;color:var(--muted);flex-shrink:0}
+
+.seg{display:grid;gap:6px}
+.seg-btn{padding:10px 6px;border-radius:9px;border:1.5px solid var(--border);background:#fff;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer;text-align:center;line-height:1.3}
+.seg-btn.on{background:var(--primary);border-color:var(--primary);color:#fff}
+.seg-btn.on-warn{background:var(--orange);border-color:var(--orange);color:#fff}
+
+.eq-row{display:flex;align-items:center;gap:9px;padding:9px 11px;border:1.5px solid var(--border);border-radius:9px;background:#fff;cursor:pointer;font-size:15px;font-weight:700}
+.eq-row.on{background:var(--green-bg);border-color:#86efac;color:#166534}
+.eq-row .eq-box{width:22px;height:22px;border-radius:6px;border:2px solid #cbd5e1;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:#fff}
+.eq-row.on .eq-box{background:var(--green);border-color:var(--green);color:#fff}
+
+.pin-mask{display:flex;gap:8px;align-items:center}
+.pin-mask input{flex:1;letter-spacing:2px;font-weight:800}
+
+.slot-day{margin-bottom:12px}
+.slot-day-head{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;background:var(--primary);color:#fff;border-radius:10px 10px 0 0;font-size:16px;font-weight:800}
+.slot-day-head .sd-cnt{font-size:13px;font-weight:700;background:rgba(255,255,255,.22);padding:3px 10px;border-radius:14px}
+.slot-row{display:flex;align-items:center;gap:9px;padding:10px 12px;border:1px solid var(--border);border-top:none;background:#fff;cursor:pointer}
+.slot-row:last-child{border-radius:0 0 10px 10px}
+.slot-row:active{background:#f8fafc}
+.slot-time{font-size:15px;font-weight:800;min-width:96px}
+.slot-bar{flex:1;height:9px;border-radius:6px;background:#e2e8f0;overflow:hidden}
+.slot-bar span{display:block;height:100%;background:var(--primary)}
+.slot-bar span.full{background:var(--red)}
+.slot-n{font-size:14px;font-weight:800;color:var(--muted);min-width:52px;text-align:right}
+
+.day-tabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:11px;scrollbar-width:none}
+.day-tabs::-webkit-scrollbar{display:none}
+.day-tab{flex-shrink:0;padding:8px 13px;border-radius:10px;border:1.5px solid var(--border);background:#fff;cursor:pointer;text-align:center;min-width:64px}
+.day-tab.active{background:var(--primary);border-color:var(--primary);color:#fff}
+.day-tab .dt-d{font-size:15px;font-weight:800;line-height:1.1}
+.day-tab .dt-w{font-size:11px;font-weight:700;opacity:.75;margin-top:1px}
+
+.empty{text-align:center;padding:48px 20px;color:var(--muted)}
+.empty .ico{font-size:44px;margin-bottom:8px}
+.empty p{font-size:14px;margin-top:6px;line-height:1.6}
+
+.toast{position:fixed;bottom:76px;left:50%;transform:translateX(-50%) translateY(20px);background:#1e293b;color:#fff;padding:11px 18px;border-radius:22px;font-size:14px;font-weight:600;z-index:200;opacity:0;transition:.25s;pointer-events:none;max-width:88%;text-align:center;line-height:1.5}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.cloud-status{padding:10px 12px;background:#f8fafc;border-radius:8px;border:1px solid var(--border)}
+.cs-l1{font-size:14px;font-weight:700}
+.cs-l2{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5}
+.help{font-size:12px;color:var(--muted);line-height:1.7;padding:9px 11px;background:#f8fafc;border-radius:7px;border:1px dashed var(--border)}
+.help pre{background:#fff;padding:7px;border-radius:5px;overflow-x:auto;margin-top:5px;font-size:10.5px;border:1px solid var(--border);line-height:1.5}
+.help ol{margin-left:16px}
+.help li{margin-bottom:4px}
+.warn{background:var(--yellow-bg);border:1px solid #fcd34d;color:#92400e;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:600;line-height:1.6}
+.info{background:var(--blue-bg);border:1px solid #93c5fd;color:#1e40af;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:600;line-height:1.6}
+
+table.tbl{width:100%;border-collapse:collapse;font-size:14px}
+table.tbl th,table.tbl td{padding:8px 9px;border-bottom:1px solid var(--border);text-align:left}
+table.tbl th{background:#f8fafc;font-size:12px;font-weight:800;color:var(--muted)}
+table.tbl td.num{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+
+.link-box{display:flex;gap:6px;align-items:stretch}
+.link-box input{font-size:12.5px;font-family:ui-monospace,monospace}
+
+@media print{
+  header,nav,.no-print,.modal{display:none!important}
+  #mainContent{padding:0;overflow:visible}
+  body,html{height:auto;background:#fff}
+  .view{padding:0}
+  .print-only{display:block!important}
+  table.tbl{font-size:11px}
+  table.tbl th,table.tbl td{padding:4px 5px;border-bottom:1px solid #999}
+  .sec{border:none;box-shadow:none;margin-bottom:8px}
+  .sec-title{background:#eee;border-bottom:1px solid #999}
+  .pgbreak{page-break-after:always}
+}
+.print-only{display:none}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1 id="hdrTitle">인터넷·TV 장비교체</h1>
+    <button class="hdr-btn" id="syncBtn" onclick="forceSync()">동기화</button>
+    <button class="hdr-btn" onclick="switchView('settings')">⚙️</button>
+  </header>
+
+  <div id="mainContent">
+
+    <!-- ══════════ 대시보드 ══════════ -->
+    <div class="view active" id="v-dash">
+      <div class="progress-wrap">
+        <div class="progress-top">
+          <div>
+            <div class="progress-pct" id="dPct">0%</div>
+            <div class="progress-sub" id="dSub">세대 정보를 먼저 등록하세요</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:22px;font-weight:800" id="dDone">0</div>
+            <div class="progress-sub">완료</div>
+          </div>
+        </div>
+        <div class="pbar" id="dBar"></div>
+      </div>
+
+      <div class="stats-grid" id="dStats"></div>
+
+      <div class="sec">
+        <div class="sec-title">오늘 작업 <span id="dTodayDate" style="font-weight:700"></span></div>
+        <div id="dToday"></div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-title">⚠️ 조치 필요</div>
+        <div id="dAlerts"></div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-title">작업일별 진척</div>
+        <div id="dDays"></div>
+      </div>
+    </div>
+
+    <!-- ══════════ 세대 현황 ══════════ -->
+    <div class="view" id="v-units">
+      <div class="chips" id="uFloorChips"></div>
+      <div class="chips" id="uStatusChips"></div>
+      <div style="display:flex;gap:7px;margin-bottom:11px">
+        <input type="search" id="uSearch" placeholder="호실·이름·연락처 검색" oninput="renderUnits()" style="flex:1">
+        <button class="btn btn-outline btn-sm" id="uViewToggle" onclick="toggleUnitView()" style="flex-shrink:0;min-width:62px">목록</button>
+      </div>
+      <div class="legend" id="uLegend"></div>
+      <div id="uBody"></div>
+    </div>
+
+    <!-- ══════════ 일정 ══════════ -->
+    <div class="view" id="v-sched">
+      <div id="sBody"></div>
+      <div class="sec">
+        <div class="sec-title">층 단위 일괄 배정</div>
+        <div class="sec-body">
+          <div class="info">아직 예약이 없는 세대만 채웁니다. 이미 예약·완료된 세대는 건드리지 않습니다.</div>
+          <div class="form-row">
+            <div class="fg"><label>대상 층</label><select id="bkFloor"></select></div>
+            <div class="fg"><label>작업일</label><select id="bkDate"></select></div>
+          </div>
+          <div class="fg"><label>재실유형 조건</label>
+            <select id="bkPresence">
+              <option value="">전체 (미지정 포함)</option>
+              <option value="day">평일 주간 가능</option>
+              <option value="pin">부재 · 비번 제공</option>
+              <option value="evening">부재 · 저녁 희망</option>
+              <option value="weekend">부재 · 주말 희망</option>
+            </select>
+          </div>
+          <button class="btn btn-primary btn-full" onclick="bulkAssign()">해당 층 일괄 배정</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ 기사·작업지시 ══════════ -->
+    <div class="view" id="v-tech">
+      <div class="sec no-print">
+        <div class="sec-title">작업지시서 출력</div>
+        <div class="sec-body">
+          <div class="form-row">
+            <div class="fg"><label>작업일</label><select id="wsDate" onchange="renderWorksheet()"></select></div>
+            <div class="fg"><label>기사</label><select id="wsTech" onchange="renderWorksheet()"></select></div>
+          </div>
+          <button class="btn btn-primary btn-full" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>
+        </div>
+      </div>
+      <div id="wsBody"></div>
+      <div class="sec no-print">
+        <div class="sec-title">설치기사 명단 <button class="btn btn-outline btn-sm" onclick="addTech()">+ 추가</button></div>
+        <div id="techList"></div>
+      </div>
+    </div>
+
+    <!-- ══════════ 통계·자료 ══════════ -->
+    <div class="view" id="v-stats">
+      <div class="sec">
+        <div class="sec-title">진행 상태별</div>
+        <div style="padding:2px 0"><table class="tbl" id="stStatus"></table></div>
+      </div>
+      <div class="sec">
+        <div class="sec-title">층별 진척</div>
+        <div style="padding:2px 0"><table class="tbl" id="stFloor"></table></div>
+      </div>
+      <div class="sec">
+        <div class="sec-title">재실유형별</div>
+        <div style="padding:2px 0"><table class="tbl" id="stPresence"></table></div>
+      </div>
+      <div class="sec">
+        <div class="sec-title">장비 회수·설치 집계</div>
+        <div style="padding:2px 0"><table class="tbl" id="stEquip"></table></div>
+      </div>
+      <div class="sec no-print">
+        <div class="sec-title">자료 내보내기 / 가져오기</div>
+        <div class="sec-body">
+          <button class="btn btn-outline btn-full" onclick="exportCsv()">⬇ 전체 세대 CSV 내려받기</button>
+          <button class="btn btn-outline btn-full" onclick="exportEquipCsv()">⬇ 장비 회수대장 CSV (정산용)</button>
+          <div class="fg">
+            <label>입주민 명단 CSV 올리기 (호실,이름,연락처)</label>
+            <input type="file" id="csvFile" accept=".csv,text/csv" onchange="importCsv(event)">
+          </div>
+          <div class="help">
+            엑셀에서 <strong>다른 이름으로 저장 → CSV UTF-8</strong> 로 저장한 파일을 올리세요.<br>
+            첫 줄은 머리글로 봅니다. 열 이름에 <code>호실/호수</code>, <code>이름/성명</code>, <code>연락처/전화</code>, <code>비고</code> 가 들어가면 자동으로 인식합니다.<br>
+            같은 호실이 이미 있으면 <strong>이름·연락처만 덮어쓰고</strong> 예약·작업 상태는 유지합니다.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ 설정 ══════════ -->
+    <div class="view" id="v-settings">
+      <div class="sec">
+        <div class="sec-title">클라우드 동기화</div>
+        <div class="sec-body">
+          <div class="cloud-status" id="cloudStatus">
+            <div class="cs-l1">⚪ 미설정</div>
+            <div class="cs-l2">Firebase 설정 후 Google 로그인하면 사무소·기사 폰에서 실시간으로 같이 봅니다.</div>
+          </div>
+          <div id="cloudBtns" style="display:flex;gap:8px"></div>
+          <details>
+            <summary style="font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;padding:6px 0">Firebase 설정 열기 / 규칙 안내</summary>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+              <div class="help">
+                이 앱은 기존 <strong>시설일지 앱과 완전히 별개</strong>로 돌아갑니다. 저장 위치·설정·캐시가 모두 분리되어 있어 서로 영향을 주지 않습니다.
+                <strong>새 Firebase 프로젝트를 따로 만드는 것을 권합니다.</strong> (같은 프로젝트를 써도 데이터는 섞이지 않지만, 교체작업이 끝난 뒤 프로젝트째 정리하기 편합니다.)
+                <ol style="margin-top:6px">
+                  <li>Firebase 콘솔 → 프로젝트 추가 → 웹 앱 추가 → <strong>firebaseConfig 복사</strong></li>
+                  <li>Authentication → 로그인 방법에서 <strong>Google</strong> 과 <strong>익명</strong> 을 <u>둘 다</u> 사용 설정
+                      <br>(익명은 입주민 예약 페이지 본인확인에 씁니다)</li>
+                  <li>Firestore Database 만들기 → 규칙에 아래 내용을 <strong>통째로 붙여넣기</strong></li>
+                </ol>
+                <pre id="rulesText"></pre>
+                <button class="btn btn-outline btn-sm" onclick="copyRules()" style="margin-top:6px">규칙 복사</button>
+              </div>
+              <div class="fg">
+                <label>firebaseConfig 붙여넣기</label>
+                <textarea id="fbConfigInput" placeholder='{ "apiKey": "...", "authDomain": "...", "projectId": "...", ... }' style="font-family:ui-monospace,monospace;font-size:12px"></textarea>
+              </div>
+              <button class="btn btn-primary btn-full" onclick="saveFbConfig()">설정 저장</button>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-title">입주민 예약 페이지</div>
+        <div class="sec-body">
+          <div class="info">입주민이 이 주소로 들어가 <strong>호실 + 연락처 뒷 4자리</strong>로 본인 확인 후 직접 시간을 고릅니다. 예약 즉시 이 앱에 반영됩니다.</div>
+          <div class="fg">
+            <label>예약 페이지 주소 (문자·공고문에 넣으세요)</label>
+            <div class="link-box">
+              <input type="text" id="bookUrl" readonly>
+              <button class="btn btn-outline btn-sm" onclick="copyBookUrl()">복사</button>
+            </div>
+          </div>
+          <label style="display:flex;align-items:center;gap:9px;font-size:15px;font-weight:700;cursor:pointer">
+            <input type="checkbox" id="cfgBookingOpen" onchange="saveConfigFromForm()"> 입주민 예약 접수 열기
+          </label>
+          <div class="help">접수를 닫으면 예약 페이지에서 "접수 마감" 안내가 나오고 새 예약이 들어오지 않습니다. 이미 확정된 예약은 그대로 유지됩니다.</div>
+          <div id="fbjsWarn"></div>
+          <button class="btn btn-outline btn-full btn-sm" onclick="showFbJs()">📄 fbconfig.js 내용 만들기</button>
+          <div class="help">
+            입주민 예약 페이지가 열리려면 GitHub의 <code>internet-TV/fbconfig.js</code> 파일에 접속 설정이 들어 있어야 합니다.
+            위 버튼으로 내용을 복사해 GitHub에서 그 파일에 붙여넣고 저장(커밋)하세요. <strong>최초 1회만</strong> 하면 됩니다.
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-title">작업일 설정</div>
+        <div class="sec-body">
+          <div id="cfgDays"></div>
+          <button class="btn btn-outline btn-full btn-sm" onclick="addWorkDay()">+ 작업일 추가</button>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-title">시간대 설정</div>
+        <div class="sec-body">
+          <div class="fg"><label style="font-size:13px;color:var(--text)">평일 시간대</label><div id="cfgSlotsWeekday"></div>
+            <button class="btn btn-outline btn-sm" onclick="addSlot('weekday')">+ 평일 시간대 추가</button></div>
+          <div class="fg"><label style="font-size:13px;color:var(--text)">주말 시간대</label><div id="cfgSlotsWeekend"></div>
+            <button class="btn btn-outline btn-sm" onclick="addSlot('weekend')">+ 주말 시간대 추가</button></div>
+          <div class="help"><strong>정원</strong>은 그 시간대에 받을 수 있는 세대 수입니다. 기사 인원 × 시간당 처리 세대로 잡으세요. 정원이 차면 입주민 예약 페이지에서 그 시간대가 <strong>마감</strong>으로 표시됩니다.</div>
+          <div id="capCheck"></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-title">세대 생성</div>
+        <div class="sec-body">
+          <div class="warn">최초 1회만 실행하세요. 이미 있는 호실은 건드리지 않고, 없는 호실만 새로 만듭니다.</div>
+          <div id="cfgFloors"></div>
+          <button class="btn btn-outline btn-full btn-sm" onclick="addFloorRule()">+ 층 규칙 추가</button>
+          <button class="btn btn-primary btn-full" onclick="generateUnits()">세대 생성 / 보충</button>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-title">기타</div>
+        <div class="sec-body">
+          <div class="cloud-status">
+            <div class="cs-l1" id="dataInfo">-</div>
+            <div class="cs-l2" id="verInfo"></div>
+          </div>
+          <button class="btn btn-outline btn-full btn-sm" onclick="location.reload(true)">앱 새로고침</button>
+          <button class="btn btn-danger btn-full btn-sm" onclick="wipeAll()">전체 데이터 삭제</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <nav>
+    <button class="nav-item active" data-v="dash" onclick="switchView('dash')"><span class="ico">📊</span>대시보드</button>
+    <button class="nav-item" data-v="units" onclick="switchView('units')"><span class="ico">🏢</span>세대</button>
+    <button class="nav-item" data-v="sched" onclick="switchView('sched')"><span class="ico">📅</span>일정</button>
+    <button class="nav-item" data-v="tech" onclick="switchView('tech')"><span class="ico">🧾</span>작업지시</button>
+    <button class="nav-item" data-v="stats" onclick="switchView('stats')"><span class="ico">📈</span>통계</button>
+  </nav>
+</div>
+
+<!-- 세대 상세 -->
+<div class="modal" id="unitModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="umTitle">201호</h2>
+      <button class="x-btn" onclick="closeUnitModal()">✕</button>
+    </div>
+    <div class="modal-body" id="umBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeUnitModal()" style="flex:1">닫기</button>
+      <button class="btn btn-primary" onclick="saveUnitModal()" style="flex:2">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════
+   상수 · 상태
+   ═══════════════════════════════════════════ */
+const APP_VERSION = 'v1.0 (2026-07-27)';
+const SITE_ID = 'unseo-thetime';
+const LS_UNITS = 'ittv_units';
+const LS_CONFIG = 'ittv_config';
+const LS_FB = 'ittv_fbconfig';
+
+const STATUS = {
+  todo:      { label:'미접촉', cls:'st-todo',      color:'#94a3b8' },
+  contacted: { label:'연락완료', cls:'st-contacted', color:'#f59e0b' },
+  booked:    { label:'예약확정', cls:'st-booked',   color:'#2563eb' },
+  done:      { label:'작업완료', cls:'st-done',     color:'#16a34a' },
+  absent:    { label:'부재·재방문', cls:'st-absent', color:'#ea580c' },
+  hold:      { label:'보류·거부', cls:'st-hold',    color:'#ef4444' },
+  vacant:    { label:'공실',     cls:'st-vacant',   color:'#cbd5e1' },
+};
+const STATUS_ORDER = ['todo','contacted','booked','done','absent','hold','vacant'];
+
+const PRESENCE = {
+  '':        '미지정',
+  day:       '평일 주간 가능',
+  pin:       '부재 · 비번 제공',
+  evening:   '부재 · 저녁 희망',
+  weekend:   '부재 · 주말 희망',
+  vacant:    '공실',
+};
+
+// 회수 2종 + 설치 2종
+const EQUIP = [
+  { key:'router', label:'인터넷 공유기' },
+  { key:'stb',    label:'셋톱박스' },
+];
+
+let units = [];        // 세대 배열
+let config = null;     // 설정
+let unitView = 'grid'; // grid | list
+let curFloor = 'all';
+let curStatus = 'all';
+let editingUnitId = null;
+let toastTimer = null;
+
+// Firebase
+let fbConfig = null;
+let firebaseApp=null, firebaseAuth=null, firebaseDB=null;
+let cloudUser = null;
+let unsubUnits=null, unsubConfig=null, unsubBookings=null;
+let cloudApplying = false;
+let lastSyncAt = null;
+
+/* ═══════════════════════════════════════════
+   유틸
+   ═══════════════════════════════════════════ */
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escA(s){ return String(s==null?'':s).replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function toast(msg, ms){
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'), ms||2200);
+}
+function todayStr(){
+  const d=new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+const DOW = ['일','월','화','수','목','금','토'];
+function dowOf(dateStr){
+  if(!dateStr) return '';
+  const d = new Date(dateStr+'T00:00:00');
+  return isNaN(d) ? '' : DOW[d.getDay()];
+}
+function isWeekendDate(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  if(isNaN(d)) return false;
+  const g = d.getDay();
+  return g===0 || g===6;
+}
+function fmtDate(dateStr){
+  if(!dateStr) return '';
+  const p = dateStr.split('-');
+  if(p.length!==3) return dateStr;
+  return `${Number(p[1])}/${Number(p[2])}(${dowOf(dateStr)})`;
+}
+function normPhone(s){
+  return String(s||'').replace(/[^0-9]/g,'');
+}
+function last4(s){
+  const n = normPhone(s);
+  return n.length>=4 ? n.slice(-4) : '';
+}
+
+/* ═══════════════════════════════════════════
+   기본 설정
+   ═══════════════════════════════════════════ */
+function defaultConfig(){
+  return {
+    siteName: '운서역더타임',
+    bookingOpen: true,
+    // 평일 3일 + 주말 2일 (2026-08 중순 기준 · 설정에서 변경 가능)
+    days: [
+      { date:'2026-08-13', note:'' },
+      { date:'2026-08-14', note:'' },
+      { date:'2026-08-15', note:'' },
+      { date:'2026-08-16', note:'' },
+      { date:'2026-08-17', note:'' },
+    ],
+    slots: {
+      weekday: [
+        { id:'w1', from:'08:00', to:'10:00', cap:14 },
+        { id:'w2', from:'10:00', to:'12:00', cap:14 },
+        { id:'w3', from:'13:00', to:'15:00', cap:14 },
+        { id:'w4', from:'15:00', to:'17:00', cap:14 },
+        { id:'w5', from:'17:00', to:'18:00', cap:7  },
+        { id:'w6', from:'19:00', to:'20:00', cap:7  },
+      ],
+      weekend: [
+        { id:'e1', from:'09:00', to:'11:00', cap:18 },
+        { id:'e2', from:'11:00', to:'13:00', cap:18 },
+        { id:'e3', from:'14:00', to:'16:00', cap:18 },
+        { id:'e4', from:'16:00', to:'18:00', cap:18 },
+      ],
+    },
+    // 2~4층 35세대, 5~10층 36세대 (설정에서 변경 가능)
+    floorRules: [
+      { from:2, to:4,  start:1, count:35 },
+      { from:5, to:10, start:1, count:36 },
+    ],
+    techs: [],
+    updatedAt: 0,
+  };
+}
+
+function slotsForDate(dateStr){
+  if(!config) return [];
+  return isWeekendDate(dateStr) ? (config.slots.weekend||[]) : (config.slots.weekday||[]);
+}
+function slotById(dateStr, id){
+  return slotsForDate(dateStr).find(s=>s.id===id) || null;
+}
+function slotLabel(dateStr, id){
+  const s = slotById(dateStr, id);
+  return s ? `${s.from}~${s.to}` : '';
+}
+
+/* ═══════════════════════════════════════════
+   저장 / 불러오기
+   ═══════════════════════════════════════════ */
+function loadLocal(){
+  try{
+    const u = localStorage.getItem(LS_UNITS);
+    units = u ? JSON.parse(u) : [];
+  }catch(e){ units=[]; }
+  try{
+    const c = localStorage.getItem(LS_CONFIG);
+    config = c ? Object.assign(defaultConfig(), JSON.parse(c)) : defaultConfig();
+  }catch(e){ config = defaultConfig(); }
+  if(!config.slots) config.slots = defaultConfig().slots;
+  if(!config.days) config.days = defaultConfig().days;
+  if(!config.techs) config.techs = [];
+  if(!config.floorRules) config.floorRules = defaultConfig().floorRules;
+  try{
+    const f = localStorage.getItem(LS_FB);
+    fbConfig = f ? JSON.parse(f) : null;
+  }catch(e){ fbConfig=null; }
+  units.forEach(normalizeUnit);
+}
+function saveLocal(){
+  try{
+    localStorage.setItem(LS_UNITS, JSON.stringify(units));
+    localStorage.setItem(LS_CONFIG, JSON.stringify(config));
+  }catch(e){ toast('⚠️ 저장 공간이 부족합니다'); }
+}
+function normalizeUnit(u){
+  if(!u.ret) u.ret = { router:false, stb:false };
+  if(!u.ins) u.ins = { router:false, stb:false };
+  if(!u.status) u.status = 'todo';
+  if(u.presence===undefined) u.presence = '';
+  if(!u.sn) u.sn = { router:'', stb:'' };
+  if(typeof u.updatedAt!=='number') u.updatedAt = 0;
+  return u;
+}
+
+/* ═══════════════════════════════════════════
+   화면 전환
+   ═══════════════════════════════════════════ */
+function switchView(v){
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
+  const el = $('v-'+v);
+  if(el) el.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active', b.dataset.v===v));
+  $('mainContent').scrollTop = 0;
+  if(v==='dash') renderDash();
+  if(v==='units') renderUnits();
+  if(v==='sched') renderSched();
+  if(v==='tech') renderTechView();
+  if(v==='stats') renderStats();
+  if(v==='settings') renderSettings();
+}
+
+function renderAll(){
+  const active = document.querySelector('.view.active');
+  const v = active ? active.id.replace('v-','') : 'dash';
+  if(v==='dash') renderDash();
+  else if(v==='units') renderUnits();
+  else if(v==='sched') renderSched();
+  else if(v==='tech') renderTechView();
+  else if(v==='stats') renderStats();
+  else if(v==='settings') renderSettings();
+}
+
+/* ═══════════════════════════════════════════
+   대시보드
+   ═══════════════════════════════════════════ */
+function counts(){
+  const c = {}; STATUS_ORDER.forEach(k=>c[k]=0);
+  units.forEach(u=>{ if(c[u.status]===undefined) c[u.status]=0; c[u.status]++; });
+  return c;
+}
+function activeUnits(){ return units.filter(u=>u.status!=='vacant'); }
+
+function renderDash(){
+  const c = counts();
+  const total = activeUnits().length;
+  const done = c.done||0;
+  const pct = total ? Math.round(done/total*100) : 0;
+  $('dPct').textContent = pct+'%';
+  $('dDone').textContent = done;
+  $('dSub').textContent = total ? `전체 ${total}세대 중 ${done}세대 완료 (공실 ${c.vacant||0} 제외)` : '세대가 없습니다 · 설정에서 생성하세요';
+
+  const segs = [
+    ['done', c.done||0], ['booked', c.booked||0], ['contacted', c.contacted||0],
+    ['absent', c.absent||0], ['hold', c.hold||0], ['todo', c.todo||0]
+  ];
+  $('dBar').innerHTML = total ? segs.map(([k,n])=>
+    n ? `<span style="width:${n/total*100}%;background:${STATUS[k].color}" title="${STATUS[k].label} ${n}"></span>` : ''
+  ).join('') : '';
+
+  $('dStats').innerHTML = ['todo','contacted','booked','absent','hold','done'].map(k=>`
+    <div class="stat-card" onclick="jumpUnits('${k}')">
+      <div class="stat-num" style="color:${STATUS[k].color}">${c[k]||0}</div>
+      <div class="stat-label">${STATUS[k].label}</div>
+    </div>`).join('');
+
+  // 오늘 작업
+  const t = todayStr();
+  $('dTodayDate').textContent = fmtDate(t);
+  const todayUnits = units.filter(u=>u.date===t).sort(sortBySlotThenHo);
+  $('dToday').innerHTML = todayUnits.length
+    ? todayUnits.map(u=>unitRowHtml(u,true)).join('')
+    : `<div class="empty" style="padding:26px"><div class="ico">☕</div><p>오늘 예정된 작업이 없습니다</p></div>`;
+
+  // 조치 필요
+  const alerts = [];
+  units.filter(u=>u.status==='absent').forEach(u=>alerts.push([u,'재방문 필요']));
+  units.filter(u=>u.status==='hold').forEach(u=>alerts.push([u,'보류·거부 — 확인 필요']));
+  units.filter(u=>u.status==='done' && !(u.ret.router && u.ret.stb)).forEach(u=>{
+    const miss = EQUIP.filter(e=>!u.ret[e.key]).map(e=>e.label).join('·');
+    alerts.push([u,'미회수: '+miss]);
+  });
+  const past = config.days.map(d=>d.date).filter(d=>d && d<t);
+  units.filter(u=>u.date && past.includes(u.date) && u.status!=='done' && u.status!=='hold' && u.status!=='vacant')
+       .forEach(u=>alerts.push([u,`${fmtDate(u.date)} 예약분 미처리`]));
+
+  $('dAlerts').innerHTML = alerts.length
+    ? alerts.slice(0,40).map(([u,msg])=>`
+        <div class="ulist-item" onclick="openUnit('${u.id}')">
+          <div class="ul-ho">${esc(u.ho)}</div>
+          <div class="ul-mid">
+            <div class="ul-name">${esc(u.name||'(이름 없음)')}</div>
+            <div class="ul-meta" style="color:var(--orange);font-weight:700">${esc(msg)}</div>
+          </div>
+          <span class="badge ${STATUS[u.status].cls}">${STATUS[u.status].label}</span>
+        </div>`).join('')
+    : `<div class="empty" style="padding:26px"><div class="ico">✅</div><p>조치할 항목이 없습니다</p></div>`;
+
+  // 작업일별
+  $('dDays').innerHTML = config.days.filter(d=>d.date).map(d=>{
+    const list = units.filter(u=>u.date===d.date);
+    const dn = list.filter(u=>u.status==='done').length;
+    const cap = slotsForDate(d.date).reduce((s,x)=>s+(Number(x.cap)||0),0);
+    const p = list.length ? Math.round(dn/list.length*100) : 0;
+    return `<div class="slot-row" onclick="switchView('sched')">
+      <div class="slot-time">${fmtDate(d.date)}</div>
+      <div class="slot-bar"><span style="width:${p}%"></span></div>
+      <div class="slot-n">${dn}/${list.length}</div>
+      <div style="font-size:11px;color:var(--muted);min-width:46px;text-align:right">정원${cap}</div>
+    </div>`;
+  }).join('') || `<div class="empty" style="padding:22px"><p>설정에서 작업일을 등록하세요</p></div>`;
+}
+
+function jumpUnits(status){
+  curStatus = status; curFloor='all';
+  switchView('units');
+}
+function sortBySlotThenHo(a,b){
+  const sa = a.slot||'zzz', sb = b.slot||'zzz';
+  if(sa!==sb) return sa<sb?-1:1;
+  return String(a.ho).localeCompare(String(b.ho));
+}
+function unitRowHtml(u, showSlot){
+  const st = STATUS[u.status]||STATUS.todo;
+  const bits = [];
+  if(showSlot && u.slot) bits.push(slotLabel(u.date,u.slot));
+  else if(u.date) bits.push(fmtDate(u.date)+' '+slotLabel(u.date,u.slot));
+  if(u.tech) bits.push(u.tech);
+  if(u.presence) bits.push(PRESENCE[u.presence]);
+  return `<div class="ulist-item" onclick="openUnit('${u.id}')">
+    <div class="ul-ho">${esc(u.ho)}</div>
+    <div class="ul-mid">
+      <div class="ul-name">${esc(u.name||'(이름 없음)')}</div>
+      <div class="ul-meta">${esc(bits.filter(Boolean).join(' · ')||'—')}</div>
+    </div>
+    <span class="badge ${st.cls}">${st.label}</span>
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════
+   세대 현황
+   ═══════════════════════════════════════════ */
+function floorsList(){
+  return [...new Set(units.map(u=>u.floor))].sort((a,b)=>a-b);
+}
+function toggleUnitView(){
+  unitView = unitView==='grid' ? 'list' : 'grid';
+  $('uViewToggle').textContent = unitView==='grid' ? '목록' : '타일';
+  renderUnits();
+}
+function renderUnits(){
+  const floors = floorsList();
+  $('uFloorChips').innerHTML =
+    `<button class="chip ${curFloor==='all'?'active':''}" onclick="setFloor('all')">전체 ${units.length}</button>` +
+    floors.map(f=>`<button class="chip ${curFloor===f?'active':''}" onclick="setFloor(${f})">${f}층</button>`).join('');
+
+  const c = counts();
+  $('uStatusChips').innerHTML =
+    `<button class="chip ${curStatus==='all'?'active':''}" onclick="setStatus('all')">전체</button>` +
+    STATUS_ORDER.map(k=>`<button class="chip ${curStatus===k?'active':''}" onclick="setStatus('${k}')">${STATUS[k].label} ${c[k]||0}</button>`).join('');
+
+  $('uLegend').innerHTML = unitView==='grid'
+    ? STATUS_ORDER.map(k=>`<span><i style="background:${STATUS[k].color}22;border-color:${STATUS[k].color}"></i>${STATUS[k].label}</span>`).join('')
+    : '';
+
+  const q = ($('uSearch').value||'').trim().toLowerCase();
+  let list = units.filter(u=>{
+    if(curFloor!=='all' && u.floor!==curFloor) return false;
+    if(curStatus!=='all' && u.status!==curStatus) return false;
+    if(q){
+      const hay = `${u.ho} ${u.name||''} ${u.phone||''} ${u.tech||''}`.toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  list.sort((a,b)=> a.floor-b.floor || String(a.ho).localeCompare(String(b.ho)));
+
+  if(!list.length){
+    $('uBody').innerHTML = units.length
+      ? `<div class="empty"><div class="ico">🔍</div><p>조건에 맞는 세대가 없습니다</p></div>`
+      : `<div class="empty"><div class="ico">🏢</div><p>등록된 세대가 없습니다<br>설정 → 세대 생성에서 만들어 주세요</p>
+         <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="switchView('settings')">설정으로 가기</button></div>`;
+    return;
+  }
+
+  if(unitView==='list'){
+    $('uBody').innerHTML = `<div class="card">${list.map(u=>unitRowHtml(u,false)).join('')}</div>`;
+    return;
+  }
+
+  // 타일: 층별로 묶어서
+  const byFloor = {};
+  list.forEach(u=>{ (byFloor[u.floor] = byFloor[u.floor]||[]).push(u); });
+  $('uBody').innerHTML = Object.keys(byFloor).sort((a,b)=>a-b).map(f=>`
+    <div class="sec">
+      <div class="sec-title">${f}층 <span>${byFloor[f].filter(u=>u.status==='done').length}/${byFloor[f].length} 완료</span></div>
+      <div style="padding:9px">
+        <div class="floor-grid">
+          ${byFloor[f].map(u=>{
+            const st = STATUS[u.status]||STATUS.todo;
+            let sub = '';
+            if(u.date) sub = fmtDate(u.date).replace(/\(.\)/,'');
+            else if(u.presence) sub = ({day:'주간',pin:'비번',evening:'저녁',weekend:'주말',vacant:'공실'})[u.presence]||'';
+            return `<div class="unit-tile ${st.cls}" onclick="openUnit('${u.id}')">
+              ${u.presence==='pin' && u.pin ? '<span class="u-dot">🔑</span>' : ''}
+              <div class="u-ho">${esc(u.ho)}</div>
+              <div class="u-sub">${sub ? esc(sub) : '&nbsp;'}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>`).join('');
+}
+function setFloor(f){ curFloor=f; renderUnits(); }
+function setStatus(s){ curStatus=s; renderUnits(); }
+
+/* ═══════════════════════════════════════════
+   세대 상세 모달
+   ═══════════════════════════════════════════ */
+function openUnit(id){
+  const u = units.find(x=>x.id===id);
+  if(!u) return;
+  editingUnitId = id;
+  $('umTitle').textContent = u.ho + '호';
+  // 목록 보기 모드에서 바뀐 하단 버튼을 원래대로 복구
+  $('unitModal').querySelector('.modal-foot').innerHTML =
+    `<button class="btn btn-outline" onclick="closeUnitModal()" style="flex:1">닫기</button>
+     <button class="btn btn-primary" onclick="saveUnitModal()" style="flex:2">저장</button>`;
+
+  const dayOpts = ['<option value="">— 미정 —</option>']
+    .concat(config.days.filter(d=>d.date).map(d=>`<option value="${d.date}" ${u.date===d.date?'selected':''}>${fmtDate(d.date)}</option>`)).join('');
+  const techOpts = ['<option value="">— 미배정 —</option>']
+    .concat((config.techs||[]).map(t=>`<option value="${escA(t.name)}" ${u.tech===t.name?'selected':''}>${esc(t.name)}</option>`)).join('');
+
+  $('umBody').innerHTML = `
+    <div class="sec">
+      <div class="sec-title">입주민</div>
+      <div class="sec-body">
+        <div class="form-row">
+          <div class="fg"><label>이름</label><input id="umName" value="${escA(u.name||'')}"></div>
+          <div class="fg"><label>연락처</label><input id="umPhone" type="tel" inputmode="numeric" value="${escA(u.phone||'')}"></div>
+        </div>
+        ${u.phone ? `<a class="btn btn-outline btn-full btn-sm" href="tel:${escA(normPhone(u.phone))}">📞 ${esc(u.phone)} 전화걸기</a>` : ''}
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">재실 유형</div>
+      <div class="sec-body">
+        <div class="seg" style="grid-template-columns:repeat(2,1fr)" id="umPresence">
+          ${Object.entries(PRESENCE).filter(([k])=>k!=='').map(([k,v])=>
+            `<button type="button" class="seg-btn ${u.presence===k?'on':''}" data-v="${k}" onclick="pickSeg(this,'umPresence')">${v}</button>`).join('')}
+        </div>
+        <div id="umPinWrap" style="display:${u.presence==='pin'?'block':'none'}">
+          <div class="fg">
+            <label>현관 비밀번호</label>
+            <div class="pin-mask">
+              <input id="umPin" type="password" value="${escA(u.pin||'')}" placeholder="작업 완료 시 자동 삭제">
+              <button class="btn btn-outline btn-sm" type="button" onclick="togglePin()">보기</button>
+            </div>
+          </div>
+          <div class="warn" style="margin-top:8px">작업완료로 바꾸면 비밀번호가 <strong>자동 삭제</strong>됩니다. 입주민께 비번 변경을 안내하세요.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">예약</div>
+      <div class="sec-body">
+        <div class="form-row">
+          <div class="fg"><label>작업일</label><select id="umDate" onchange="onUmDateChange()">${dayOpts}</select></div>
+          <div class="fg"><label>시간대</label><select id="umSlot"></select></div>
+        </div>
+        <div class="fg"><label>담당 기사</label><select id="umTech">${techOpts}</select></div>
+        ${u.bookedBy==='self' ? `<div class="info">입주민이 예약 페이지에서 직접 신청했습니다${u.bookedAt?` (${esc(u.bookedAt)})`:''}</div>` : ''}
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">장비 회수 (기존)</div>
+      <div class="sec-body">
+        ${EQUIP.map(e=>`
+          <div class="eq-row ${u.ret[e.key]?'on':''}" data-k="ret_${e.key}" onclick="toggleEq(this)">
+            <div class="eq-box">${u.ret[e.key]?'✓':''}</div>${e.label} 회수
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">장비 설치 (신규)</div>
+      <div class="sec-body">
+        ${EQUIP.map(e=>`
+          <div class="eq-row ${u.ins[e.key]?'on':''}" data-k="ins_${e.key}" onclick="toggleEq(this)">
+            <div class="eq-box">${u.ins[e.key]?'✓':''}</div>${e.label} 설치
+          </div>`).join('')}
+        <div class="form-row">
+          <div class="fg"><label>공유기 S/N</label><input id="umSnRouter" value="${escA(u.sn.router||'')}"></div>
+          <div class="fg"><label>셋톱 S/N</label><input id="umSnStb" value="${escA(u.sn.stb||'')}"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">진행 상태</div>
+      <div class="sec-body">
+        <div class="seg" style="grid-template-columns:repeat(2,1fr)" id="umStatus">
+          ${STATUS_ORDER.map(k=>
+            `<button type="button" class="seg-btn ${u.status===k?(k==='absent'||k==='hold'?'on-warn':'on'):''}" data-v="${k}" onclick="pickSeg(this,'umStatus')">${STATUS[k].label}</button>`).join('')}
+        </div>
+        <div class="fg"><label>메모</label><textarea id="umNote" placeholder="부재 사유, 재방문 약속, 특이사항">${esc(u.note||'')}</textarea></div>
+      </div>
+    </div>
+    <div style="height:6px"></div>
+  `;
+
+  fillSlotSelect(u.date, u.slot);
+  // 재실유형 클릭 시 비번칸 토글
+  $('umPresence').addEventListener('click', ()=>{
+    const sel = $('umPresence').querySelector('.seg-btn.on');
+    $('umPinWrap').style.display = (sel && sel.dataset.v==='pin') ? 'block' : 'none';
+  });
+  $('unitModal').classList.add('open');
+}
+function pickSeg(btn, wrapId){
+  const wrap = $(wrapId);
+  wrap.querySelectorAll('.seg-btn').forEach(b=>b.classList.remove('on','on-warn'));
+  const v = btn.dataset.v;
+  btn.classList.add((v==='absent'||v==='hold') ? 'on-warn' : 'on');
+}
+function segValue(wrapId){
+  const b = $(wrapId).querySelector('.seg-btn.on, .seg-btn.on-warn');
+  return b ? b.dataset.v : '';
+}
+function toggleEq(el){
+  el.classList.toggle('on');
+  el.querySelector('.eq-box').textContent = el.classList.contains('on') ? '✓' : '';
+}
+function togglePin(){
+  const i = $('umPin');
+  i.type = i.type==='password' ? 'text' : 'password';
+}
+function onUmDateChange(){ fillSlotSelect($('umDate').value, ''); }
+function fillSlotSelect(dateStr, cur){
+  const sel = $('umSlot');
+  if(!dateStr){ sel.innerHTML = '<option value="">— 날짜 먼저 —</option>'; return; }
+  const list = slotsForDate(dateStr);
+  sel.innerHTML = '<option value="">— 미정 —</option>' + list.map(s=>{
+    const n = units.filter(u=>u.date===dateStr && u.slot===s.id && u.id!==editingUnitId).length;
+    const full = n >= (Number(s.cap)||0);
+    return `<option value="${s.id}" ${cur===s.id?'selected':''}>${s.from}~${s.to} (${n}/${s.cap})${full?' 정원초과':''}</option>`;
+  }).join('');
+}
+function closeUnitModal(){ $('unitModal').classList.remove('open'); editingUnitId=null; }
+
+function saveUnitModal(){
+  const u = units.find(x=>x.id===editingUnitId);
+  if(!u) return closeUnitModal();
+  u.name  = $('umName').value.trim();
+  u.phone = $('umPhone').value.trim();
+  u.phone4 = last4(u.phone);
+  u.presence = segValue('umPresence');
+  u.pin = u.presence==='pin' ? ($('umPin')?$('umPin').value.trim():'') : '';
+  u.date = $('umDate').value;
+  u.slot = $('umSlot').value;
+  u.tech = $('umTech').value;
+  u.sn = { router: $('umSnRouter').value.trim(), stb: $('umSnStb').value.trim() };
+  EQUIP.forEach(e=>{
+    u.ret[e.key] = document.querySelector(`[data-k="ret_${e.key}"]`).classList.contains('on');
+    u.ins[e.key] = document.querySelector(`[data-k="ins_${e.key}"]`).classList.contains('on');
+  });
+  const newStatus = segValue('umStatus');
+  u.status = newStatus || 'todo';
+  u.note = $('umNote').value.trim();
+
+  // 완료 처리 시 비밀번호 자동 삭제 (개인정보 보호)
+  if(u.status==='done' && u.pin){ u.pin=''; toast('🔐 작업완료 — 저장된 비밀번호를 삭제했습니다', 3200); }
+  // 예약이 잡히면 상태를 자동 승격 (미접촉/연락완료 → 예약확정)
+  if(u.date && u.slot && (u.status==='todo'||u.status==='contacted')) u.status='booked';
+  if(u.presence==='vacant') u.status='vacant';
+
+  u.updatedAt = Date.now();
+  saveLocal(); pushUnit(u); renderAll(); closeUnitModal();
+  toast('저장했습니다');
+}
+
+/* ═══════════════════════════════════════════
+   일정
+   ═══════════════════════════════════════════ */
+function renderSched(){
+  const days = config.days.filter(d=>d.date);
+  if(!days.length){
+    $('sBody').innerHTML = `<div class="empty"><div class="ico">📅</div><p>작업일이 없습니다<br>설정에서 등록하세요</p></div>`;
+  } else {
+    $('sBody').innerHTML = days.map(d=>{
+      const slots = slotsForDate(d.date);
+      const dayList = units.filter(u=>u.date===d.date);
+      const cap = slots.reduce((s,x)=>s+(Number(x.cap)||0),0);
+      const rows = slots.map(s=>{
+        const list = dayList.filter(u=>u.slot===s.id);
+        const n = list.length, capN = Number(s.cap)||0;
+        const pct = capN ? Math.min(100, n/capN*100) : 0;
+        const dn = list.filter(u=>u.status==='done').length;
+        return `<div class="slot-row" onclick="showSlotUnits('${d.date}','${s.id}')">
+          <div class="slot-time">${s.from}~${s.to}</div>
+          <div class="slot-bar"><span class="${n>=capN&&capN?'full':''}" style="width:${pct}%"></span></div>
+          <div class="slot-n">${n}/${capN}</div>
+          <div style="font-size:11px;color:var(--green);font-weight:800;min-width:40px;text-align:right">✓${dn}</div>
+        </div>`;
+      }).join('');
+      const unassigned = dayList.filter(u=>!u.slot).length;
+      return `<div class="slot-day">
+        <div class="slot-day-head">
+          <span>${fmtDate(d.date)} ${isWeekendDate(d.date)?'주말':'평일'}</span>
+          <span class="sd-cnt">${dayList.length} / 정원 ${cap}</span>
+        </div>
+        ${rows || '<div class="slot-row">시간대가 없습니다</div>'}
+        ${unassigned ? `<div class="slot-row" onclick="showSlotUnits('${d.date}','')"><div class="slot-time" style="color:var(--orange)">시간 미정</div><div class="slot-bar"></div><div class="slot-n">${unassigned}</div><div style="min-width:40px"></div></div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  // 일괄 배정 셀렉트
+  $('bkFloor').innerHTML = floorsList().map(f=>`<option value="${f}">${f}층</option>`).join('') || '<option value="">세대 없음</option>';
+  $('bkDate').innerHTML = days.map(d=>`<option value="${d.date}">${fmtDate(d.date)}</option>`).join('') || '<option value="">작업일 없음</option>';
+}
+
+function showSlotUnits(date, slot){
+  const list = units.filter(u=>u.date===date && (u.slot||'')===slot)
+                    .sort((a,b)=>String(a.ho).localeCompare(String(b.ho)));
+  if(!list.length) return toast('배정된 세대가 없습니다');
+  const label = slot ? slotLabel(date,slot) : '시간 미정';
+  $('umTitle').textContent = `${fmtDate(date)} ${label}`;
+  $('umBody').innerHTML = `<div class="card">${list.map(u=>unitRowHtml(u,false)).join('')}</div>
+    <div class="info">세대를 누르면 상세로 넘어갑니다.</div>`;
+  editingUnitId = null;
+  $('unitModal').classList.add('open');
+  // 저장 버튼 감춤 (목록 보기 모드)
+  $('unitModal').querySelector('.modal-foot').innerHTML =
+    `<button class="btn btn-outline btn-full" onclick="closeUnitModal()">닫기</button>`;
+}
+
+function bulkAssign(){
+  const floor = Number($('bkFloor').value);
+  const date = $('bkDate').value;
+  const pres = $('bkPresence').value;
+  if(!floor || !date) return toast('층과 작업일을 선택하세요');
+  const slots = slotsForDate(date);
+  if(!slots.length) return toast('해당 날짜에 시간대가 없습니다');
+
+  // 대상: 해당 층 + 예약 없음 + 완료/보류/공실 아님
+  let targets = units.filter(u=>
+    u.floor===floor && !u.date &&
+    !['done','hold','vacant'].includes(u.status) &&
+    (!pres || u.presence===pres)
+  ).sort((a,b)=>String(a.ho).localeCompare(String(b.ho)));
+
+  if(!targets.length) return toast('배정할 세대가 없습니다');
+
+  let assigned = 0;
+  for(const s of slots){
+    const capN = Number(s.cap)||0;
+    let cur = units.filter(u=>u.date===date && u.slot===s.id).length;
+    while(cur < capN && targets.length){
+      const u = targets.shift();
+      u.date = date; u.slot = s.id;
+      if(u.status==='todo'||u.status==='contacted') u.status='booked';
+      u.updatedAt = Date.now();
+      pushUnit(u);
+      cur++; assigned++;
+    }
+  }
+  saveLocal(); renderAll();
+  toast(targets.length
+    ? `${assigned}세대 배정 · ${targets.length}세대는 정원이 차서 남았습니다`
+    : `${assigned}세대 배정 완료`, 3500);
+}
+
+/* ═══════════════════════════════════════════
+   기사 · 작업지시서
+   ═══════════════════════════════════════════ */
+function renderTechView(){
+  const days = config.days.filter(d=>d.date);
+  const wsD = $('wsDate');
+  const keepD = wsD.value;
+  wsD.innerHTML = days.map(d=>`<option value="${d.date}">${fmtDate(d.date)}</option>`).join('') || '<option value="">작업일 없음</option>';
+  if(keepD && days.some(d=>d.date===keepD)) wsD.value = keepD;
+  else if(days.some(d=>d.date===todayStr())) wsD.value = todayStr();
+
+  const wsT = $('wsTech');
+  const keepT = wsT.value;
+  wsT.innerHTML = '<option value="">전체 기사</option>' +
+    (config.techs||[]).map(t=>`<option value="${escA(t.name)}">${esc(t.name)}</option>`).join('') +
+    '<option value="__none__">미배정</option>';
+  if(keepT) wsT.value = keepT;
+
+  renderTechList();
+  renderWorksheet();
+}
+function renderTechList(){
+  const list = config.techs||[];
+  $('techList').innerHTML = list.length ? list.map((t,i)=>`
+    <div class="ulist-item" style="cursor:default">
+      <div class="ul-mid">
+        <div class="ul-name">${esc(t.name)}</div>
+        <div class="ul-meta">${esc(t.phone||'')} ${t.company?'· '+esc(t.company):''} · 배정 ${units.filter(u=>u.tech===t.name).length}세대</div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="editTech(${i})">수정</button>
+      <button class="btn btn-outline btn-sm" onclick="delTech(${i})" style="color:var(--red)">삭제</button>
+    </div>`).join('')
+    : `<div class="empty" style="padding:24px"><p>등록된 기사가 없습니다</p></div>`;
+}
+function addTech(){
+  const name = prompt('기사 이름');
+  if(!name || !name.trim()) return;
+  const phone = prompt('연락처 (선택)') || '';
+  const company = prompt('소속 (선택)') || '';
+  config.techs.push({ name:name.trim(), phone:phone.trim(), company:company.trim() });
+  config.updatedAt = Date.now();
+  saveLocal(); pushConfig(); renderTechView();
+}
+function editTech(i){
+  const t = config.techs[i]; if(!t) return;
+  const name = prompt('기사 이름', t.name); if(name===null) return;
+  const phone = prompt('연락처', t.phone||''); if(phone===null) return;
+  const company = prompt('소속', t.company||''); if(company===null) return;
+  const old = t.name;
+  t.name = name.trim(); t.phone = phone.trim(); t.company = company.trim();
+  if(old!==t.name) units.forEach(u=>{ if(u.tech===old){ u.tech=t.name; u.updatedAt=Date.now(); pushUnit(u); } });
+  config.updatedAt = Date.now();
+  saveLocal(); pushConfig(); renderTechView();
+}
+function delTech(i){
+  const t = config.techs[i]; if(!t) return;
+  if(!confirm(`${t.name} 기사를 삭제할까요? 배정된 세대는 미배정으로 바뀝니다.`)) return;
+  units.forEach(u=>{ if(u.tech===t.name){ u.tech=''; u.updatedAt=Date.now(); pushUnit(u); } });
+  config.techs.splice(i,1);
+  config.updatedAt = Date.now();
+  saveLocal(); pushConfig(); renderTechView();
+}
+
+function renderWorksheet(){
+  const date = $('wsDate').value;
+  const tech = $('wsTech').value;
+  if(!date){ $('wsBody').innerHTML=''; return; }
+  let list = units.filter(u=>u.date===date);
+  if(tech==='__none__') list = list.filter(u=>!u.tech);
+  else if(tech) list = list.filter(u=>u.tech===tech);
+  list.sort(sortBySlotThenHo);
+
+  const title = `${config.siteName} 인터넷·TV 장비교체 작업지시서`;
+  if(!list.length){
+    $('wsBody').innerHTML = `<div class="empty"><div class="ico">🧾</div><p>해당 조건의 작업이 없습니다</p></div>`;
+    return;
+  }
+  const rows = list.map(u=>{
+    const pinCell = u.presence==='pin'
+      ? (u.pin ? `<strong>${esc(u.pin)}</strong>` : '<span style="color:#ef4444">비번 미입력</span>')
+      : (PRESENCE[u.presence]||'—');
+    return `<tr>
+      <td style="font-weight:800;font-size:15px">${esc(u.ho)}</td>
+      <td>${esc(slotLabel(date,u.slot)||'미정')}</td>
+      <td>${esc(u.name||'')}</td>
+      <td>${esc(u.phone||'')}</td>
+      <td>${pinCell}</td>
+      <td>${esc(u.tech||'')}</td>
+      <td style="letter-spacing:3px">☐☐</td>
+      <td style="letter-spacing:3px">☐☐</td>
+      <td style="min-width:70px"></td>
+    </tr>`;
+  }).join('');
+
+  $('wsBody').innerHTML = `
+    <div class="sec">
+      <div class="sec-title" style="font-size:14px;color:var(--text)">${esc(title)} — ${fmtDate(date)}${tech&&tech!=='__none__'?' / '+esc(tech):''} (${list.length}세대)</div>
+      <div style="overflow-x:auto">
+        <table class="tbl">
+          <thead><tr>
+            <th>호실</th><th>시간</th><th>성명</th><th>연락처</th><th>비번/재실</th><th>기사</th>
+            <th>회수<br><span style="font-weight:600">공유기·셋톱</span></th>
+            <th>설치<br><span style="font-weight:600">공유기·셋톱</span></th>
+            <th>확인</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div style="padding:9px 12px;font-size:11.5px;color:var(--muted);line-height:1.6">
+        ※ 비밀번호가 적힌 지시서는 <strong>작업 당일 사용 후 반드시 파쇄</strong>하십시오.
+      </div>
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════
+   통계
+   ═══════════════════════════════════════════ */
+function renderStats(){
+  const total = units.length;
+  const c = counts();
+  $('stStatus').innerHTML = `<thead><tr><th>상태</th><th class="num">세대</th><th class="num">비율</th></tr></thead><tbody>` +
+    STATUS_ORDER.map(k=>`<tr><td><span class="badge ${STATUS[k].cls}">${STATUS[k].label}</span></td>
+      <td class="num">${c[k]||0}</td><td class="num">${total?((c[k]||0)/total*100).toFixed(1):0}%</td></tr>`).join('') +
+    `<tr style="background:#f8fafc"><td><strong>합계</strong></td><td class="num"><strong>${total}</strong></td><td class="num">100%</td></tr></tbody>`;
+
+  $('stFloor').innerHTML = `<thead><tr><th>층</th><th class="num">세대</th><th class="num">완료</th><th class="num">예약</th><th class="num">진척</th></tr></thead><tbody>` +
+    floorsList().map(f=>{
+      const l = units.filter(u=>u.floor===f && u.status!=='vacant');
+      const dn = l.filter(u=>u.status==='done').length;
+      const bk = l.filter(u=>u.status==='booked').length;
+      return `<tr><td><strong>${f}층</strong></td><td class="num">${l.length}</td><td class="num">${dn}</td><td class="num">${bk}</td>
+        <td class="num">${l.length?Math.round(dn/l.length*100):0}%</td></tr>`;
+    }).join('') + `</tbody>`;
+
+  $('stPresence').innerHTML = `<thead><tr><th>재실 유형</th><th class="num">세대</th><th class="num">완료</th></tr></thead><tbody>` +
+    Object.entries(PRESENCE).map(([k,v])=>{
+      const l = units.filter(u=>(u.presence||'')===k);
+      if(!l.length) return '';
+      return `<tr><td>${v}</td><td class="num">${l.length}</td><td class="num">${l.filter(u=>u.status==='done').length}</td></tr>`;
+    }).join('') + `</tbody>`;
+
+  const doneList = units.filter(u=>u.status==='done');
+  $('stEquip').innerHTML = `<thead><tr><th>장비</th><th class="num">회수</th><th class="num">설치</th><th class="num">미회수</th></tr></thead><tbody>` +
+    EQUIP.map(e=>{
+      const r = units.filter(u=>u.ret[e.key]).length;
+      const i = units.filter(u=>u.ins[e.key]).length;
+      const miss = doneList.filter(u=>!u.ret[e.key]).length;
+      return `<tr><td>${e.label}</td><td class="num">${r}</td><td class="num">${i}</td>
+        <td class="num" style="color:${miss?'var(--red)':'inherit'}">${miss}</td></tr>`;
+    }).join('') +
+    `<tr style="background:#f8fafc"><td><strong>합계</strong></td>
+      <td class="num"><strong>${EQUIP.reduce((s,e)=>s+units.filter(u=>u.ret[e.key]).length,0)}</strong></td>
+      <td class="num"><strong>${EQUIP.reduce((s,e)=>s+units.filter(u=>u.ins[e.key]).length,0)}</strong></td>
+      <td class="num"></td></tr></tbody>`;
+}
+
+/* ═══════════════════════════════════════════
+   CSV
+   ═══════════════════════════════════════════ */
+function csvCell(v){
+  const s = String(v==null?'':v);
+  return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+function downloadCsv(filename, rows){
+  const csv = rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
+  const blob = new Blob(['﻿'+csv], { type:'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  toast('내려받았습니다');
+}
+function exportCsv(){
+  const rows = [['호실','층','이름','연락처','재실유형','작업일','시간대','기사','상태',
+                 '공유기회수','셋톱회수','공유기설치','셋톱설치','공유기S/N','셋톱S/N','메모']];
+  units.slice().sort((a,b)=>a.floor-b.floor||String(a.ho).localeCompare(String(b.ho))).forEach(u=>{
+    rows.push([u.ho,u.floor,u.name||'',u.phone||'',PRESENCE[u.presence]||'',
+      u.date||'', slotLabel(u.date,u.slot), u.tech||'', STATUS[u.status].label,
+      u.ret.router?'O':'', u.ret.stb?'O':'', u.ins.router?'O':'', u.ins.stb?'O':'',
+      u.sn.router||'', u.sn.stb||'', u.note||'']);
+  });
+  downloadCsv(`장비교체_세대현황_${todayStr()}.csv`, rows);
+}
+function exportEquipCsv(){
+  const rows = [['호실','이름','작업일','기사','공유기회수','셋톱회수','공유기설치','셋톱설치','공유기S/N','셋톱S/N','미회수사유']];
+  units.filter(u=>u.status==='done'||u.ret.router||u.ret.stb).forEach(u=>{
+    const miss = EQUIP.filter(e=>!u.ret[e.key]).map(e=>e.label).join('·');
+    rows.push([u.ho,u.name||'',u.date||'',u.tech||'',
+      u.ret.router?'O':'X', u.ret.stb?'O':'X', u.ins.router?'O':'X', u.ins.stb?'O':'X',
+      u.sn.router||'', u.sn.stb||'', miss?`미회수(${miss}) ${u.note||''}`:'']);
+  });
+  downloadCsv(`장비회수대장_${todayStr()}.csv`, rows);
+}
+function parseCsv(text){
+  const rows=[]; let row=[], cell='', q=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(q){
+      if(ch==='"'){ if(text[i+1]==='"'){ cell+='"'; i++; } else q=false; }
+      else cell+=ch;
+    } else {
+      if(ch==='"') q=true;
+      else if(ch===','){ row.push(cell); cell=''; }
+      else if(ch==='\n'){ row.push(cell); rows.push(row); row=[]; cell=''; }
+      else if(ch!=='\r') cell+=ch;
+    }
+  }
+  if(cell!==''||row.length){ row.push(cell); rows.push(row); }
+  return rows.filter(r=>r.some(c=>String(c).trim()!==''));
+}
+function importCsv(ev){
+  const f = ev.target.files[0];
+  if(!f) return;
+  const fr = new FileReader();
+  fr.onload = e=>{
+    try{
+      let text = String(e.target.result).replace(/^﻿/,'');
+      const rows = parseCsv(text);
+      if(rows.length<2) return toast('내용이 없습니다');
+      const head = rows[0].map(h=>String(h).trim());
+      const find = keys => head.findIndex(h=>keys.some(k=>h.includes(k)));
+      const iHo   = find(['호실','호수','세대']);
+      const iName = find(['이름','성명','입주민','세대주']);
+      const iPh   = find(['연락처','전화','핸드폰','휴대']);
+      const iNote = find(['비고','메모']);
+      if(iHo<0) { ev.target.value=''; return alert('머리글에서 "호실" 열을 찾지 못했습니다.\n첫 줄에 호실/이름/연락처 같은 열 이름이 있어야 합니다.'); }
+
+      let updated=0, created=0, skipped=0;
+      for(let r=1;r<rows.length;r++){
+        const ho = String(rows[r][iHo]||'').trim().replace(/호\s*$/,'');
+        if(!ho) { skipped++; continue; }
+        const name = iName>=0 ? String(rows[r][iName]||'').trim() : '';
+        const phone= iPh>=0   ? String(rows[r][iPh]||'').trim()   : '';
+        const note = iNote>=0 ? String(rows[r][iNote]||'').trim() : '';
+        let u = units.find(x=>String(x.ho)===ho);
+        if(u){
+          if(name) u.name=name;
+          if(phone){ u.phone=phone; u.phone4=last4(phone); }
+          if(note) u.note = u.note ? u.note+' / '+note : note;
+          u.updatedAt=Date.now(); pushUnit(u); updated++;
+        } else {
+          const floor = Number(String(ho).slice(0, String(ho).length-2)) || 0;
+          if(!floor){ skipped++; continue; }
+          u = normalizeUnit({ id:ho, ho, floor, name, phone, phone4:last4(phone), note, status:'todo', presence:'', date:'', slot:'', tech:'', pin:'', updatedAt:Date.now() });
+          units.push(u); pushUnit(u); created++;
+        }
+      }
+      saveLocal(); renderAll();
+      alert(`불러오기 완료\n\n수정 ${updated}세대\n신규 ${created}세대${skipped?`\n건너뜀 ${skipped}줄`:''}`);
+    }catch(err){
+      console.error(err); alert('CSV 읽기 실패: '+err.message);
+    }
+    ev.target.value='';
+  };
+  fr.readAsText(f, 'utf-8');
+}
+
+/* ═══════════════════════════════════════════
+   설정 화면
+   ═══════════════════════════════════════════ */
+function renderSettings(){
+  $('cfgBookingOpen').checked = !!config.bookingOpen;
+  $('bookUrl').value = bookingUrl();
+  $('rulesText').textContent = RULES_TEXT;
+
+  // 작업일
+  $('cfgDays').innerHTML = config.days.map((d,i)=>`
+    <div style="display:flex;gap:7px;align-items:center;margin-bottom:7px">
+      <input type="date" value="${escA(d.date||'')}" onchange="setDay(${i}, this.value)" style="flex:1">
+      <span style="font-size:13px;font-weight:800;color:var(--muted);min-width:52px">${d.date?(isWeekendDate(d.date)?'주말':'평일'):''}</span>
+      <button class="btn btn-outline btn-sm" onclick="delDay(${i})" style="color:var(--red)">삭제</button>
+    </div>`).join('');
+
+  // 시간대
+  ['weekday','weekend'].forEach(kind=>{
+    const el = $('cfgSlots'+(kind==='weekday'?'Weekday':'Weekend'));
+    el.innerHTML = (config.slots[kind]||[]).map((s,i)=>`
+      <div style="display:flex;gap:5px;align-items:center;margin-bottom:6px">
+        <input type="time" value="${escA(s.from)}" onchange="setSlot('${kind}',${i},'from',this.value)" style="flex:1;padding:8px">
+        <span style="font-weight:800;color:var(--muted)">~</span>
+        <input type="time" value="${escA(s.to)}" onchange="setSlot('${kind}',${i},'to',this.value)" style="flex:1;padding:8px">
+        <input type="number" min="0" value="${Number(s.cap)||0}" onchange="setSlot('${kind}',${i},'cap',this.value)" style="width:62px;padding:8px;text-align:center" title="정원">
+        <button class="btn btn-outline btn-sm" onclick="delSlot('${kind}',${i})" style="color:var(--red);padding:7px 9px">✕</button>
+      </div>`).join('');
+  });
+
+  // 정원 점검
+  const totalActive = units.filter(u=>u.status!=='vacant').length;
+  const totalCap = config.days.filter(d=>d.date)
+    .reduce((s,d)=>s+slotsForDate(d.date).reduce((a,x)=>a+(Number(x.cap)||0),0),0);
+  $('capCheck').innerHTML = totalActive ? `
+    <div class="${totalCap>=totalActive?'info':'warn'}">
+      작업 대상 <strong>${totalActive}세대</strong> / 전체 정원 <strong>${totalCap}세대</strong>
+      ${totalCap>=totalActive ? ' — 여유 '+(totalCap-totalActive)+'세대' : ' — <strong>'+(totalActive-totalCap)+'세대가 부족합니다.</strong> 작업일이나 정원을 늘리세요.'}
+    </div>` : '';
+
+  // 층 규칙
+  $('cfgFloors').innerHTML = config.floorRules.map((r,i)=>`
+    <div style="display:flex;gap:5px;align-items:center;margin-bottom:7px;font-size:13px;font-weight:700">
+      <input type="number" value="${r.from}" onchange="setFR(${i},'from',this.value)" style="width:56px;padding:8px;text-align:center">
+      <span>~</span>
+      <input type="number" value="${r.to}" onchange="setFR(${i},'to',this.value)" style="width:56px;padding:8px;text-align:center">
+      <span>층 ·</span>
+      <input type="number" value="${r.count}" onchange="setFR(${i},'count',this.value)" style="width:60px;padding:8px;text-align:center">
+      <span>세대</span>
+      <button class="btn btn-outline btn-sm" onclick="delFR(${i})" style="color:var(--red);padding:7px 9px">✕</button>
+    </div>`).join('') +
+    `<div class="help">각 층 <strong>01호부터 연속</strong>으로 만듭니다. 예: 2~4층 35세대 → 201~235호, 5~10층 36세대 → 501~536호.<br>
+     중간에 빠지는 호수가 있으면 생성 후 해당 세대를 <strong>공실</strong>로 바꾸거나, CSV로 실제 호실 목록을 올리세요.</div>`;
+
+  $('dataInfo').textContent = `세대 ${units.length} · 완료 ${counts().done||0} · 기사 ${(config.techs||[]).length}명`;
+  $('verInfo').textContent = `${APP_VERSION} · 마지막 동기화 ${lastSyncAt?new Date(lastSyncAt).toLocaleString('ko-KR'):'없음'}`;
+
+  renderCloudStatus();
+  if(fbConfig && !$('fbConfigInput').value) $('fbConfigInput').value = JSON.stringify(fbConfig, null, 2);
+}
+function saveConfigFromForm(){
+  config.bookingOpen = $('cfgBookingOpen').checked;
+  config.updatedAt = Date.now();
+  saveLocal(); pushConfig();
+  toast(config.bookingOpen ? '입주민 예약 접수를 열었습니다' : '입주민 예약 접수를 닫았습니다');
+}
+function setDay(i,v){ config.days[i].date=v; config.updatedAt=Date.now(); saveLocal(); pushConfig(); renderSettings(); }
+function delDay(i){
+  const d = config.days[i];
+  const n = units.filter(u=>u.date===d.date).length;
+  if(n && !confirm(`${fmtDate(d.date)} 에 ${n}세대가 예약되어 있습니다.\n삭제하면 그 세대들의 예약이 해제됩니다. 계속할까요?`)) return;
+  units.forEach(u=>{ if(u.date===d.date){ u.date=''; u.slot=''; if(u.status==='booked') u.status='contacted'; u.updatedAt=Date.now(); pushUnit(u); } });
+  config.days.splice(i,1); config.updatedAt=Date.now();
+  saveLocal(); pushConfig(); renderSettings();
+}
+function addWorkDay(){ config.days.push({date:'',note:''}); config.updatedAt=Date.now(); saveLocal(); renderSettings(); }
+function setSlot(kind,i,field,v){
+  config.slots[kind][i][field] = field==='cap' ? (Number(v)||0) : v;
+  config.updatedAt=Date.now(); saveLocal(); pushConfig(); renderSettings();
+}
+function delSlot(kind,i){
+  const s = config.slots[kind][i];
+  const n = units.filter(u=>u.slot===s.id).length;
+  if(n && !confirm(`이 시간대에 ${n}세대가 배정되어 있습니다. 삭제하면 시간이 미정으로 바뀝니다. 계속할까요?`)) return;
+  units.forEach(u=>{ if(u.slot===s.id){ u.slot=''; u.updatedAt=Date.now(); pushUnit(u); } });
+  config.slots[kind].splice(i,1); config.updatedAt=Date.now();
+  saveLocal(); pushConfig(); renderSettings();
+}
+function addSlot(kind){
+  const pre = kind==='weekday'?'w':'e';
+  const id = pre + Date.now().toString(36).slice(-4);
+  config.slots[kind].push({ id, from:'09:00', to:'11:00', cap:10 });
+  config.updatedAt=Date.now(); saveLocal(); pushConfig(); renderSettings();
+}
+function setFR(i,f,v){ config.floorRules[i][f]=Number(v)||0; config.updatedAt=Date.now(); saveLocal(); pushConfig(); renderSettings(); }
+function delFR(i){ config.floorRules.splice(i,1); config.updatedAt=Date.now(); saveLocal(); pushConfig(); renderSettings(); }
+function addFloorRule(){ config.floorRules.push({from:2,to:2,start:1,count:35}); config.updatedAt=Date.now(); saveLocal(); renderSettings(); }
+
+function generateUnits(){
+  let created = 0;
+  config.floorRules.forEach(r=>{
+    for(let f=r.from; f<=r.to; f++){
+      for(let n=1; n<=r.count; n++){
+        const ho = String(f) + String(n).padStart(2,'0');
+        if(units.some(u=>String(u.ho)===ho)) continue;
+        const u = normalizeUnit({ id:ho, ho, floor:f, name:'', phone:'', phone4:'',
+          presence:'', pin:'', date:'', slot:'', tech:'', status:'todo', note:'', updatedAt:Date.now() });
+        units.push(u); pushUnit(u); created++;
+      }
+    }
+  });
+  saveLocal(); renderAll(); renderSettings();
+  alert(created ? `${created}세대를 새로 만들었습니다.\n현재 총 ${units.length}세대입니다.` : '새로 만들 세대가 없습니다. (이미 모두 있음)');
+}
+function wipeAll(){
+  if(!confirm('세대·예약·기사 정보를 모두 지웁니다. 되돌릴 수 없습니다. 계속할까요?')) return;
+  if(!confirm('정말 삭제하시겠습니까? 마지막 확인입니다.')) return;
+  const ids = units.map(u=>u.id);
+  units = []; config = defaultConfig();
+  saveLocal();
+  if(cloudUser && firebaseDB) ids.forEach(id=>deleteUnitCloud(id));
+  renderAll(); renderSettings();
+  toast('전체 삭제했습니다');
+}
+
+function bookingUrl(){
+  const base = location.href.replace(/[^/]*$/,'');
+  return base + 'book.html';
+}
+function fbJsText(){
+  if(!fbConfig) return '';
+  return '/* Firebase 접속 설정 — 관리자 앱에서 자동 생성 */\n' +
+         'window.ITTV_FIREBASE_CONFIG = ' + JSON.stringify(fbConfig, null, 2) + ';\n';
+}
+function showFbJs(){
+  if(!fbConfig) return alert('먼저 위에서 firebaseConfig 를 저장하세요.');
+  const text = fbJsText();
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(text)
+      .then(()=>alert('복사했습니다.\n\nGitHub → internet-TV/fbconfig.js 파일을 열고\n전체 내용을 지운 뒤 붙여넣기 → 커밋하세요.'))
+      .catch(()=>prompt('아래 내용을 복사해 fbconfig.js 에 붙여넣으세요', text));
+  } else {
+    prompt('아래 내용을 복사해 fbconfig.js 에 붙여넣으세요', text);
+  }
+}
+function copyBookUrl(){
+  const i = $('bookUrl');
+  navigator.clipboard ? navigator.clipboard.writeText(i.value).then(()=>toast('예약 주소를 복사했습니다'))
+                      : (i.select(), document.execCommand('copy'), toast('복사했습니다'));
+}
+
+const RULES_TEXT = `rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+
+    // 관리자 = 구글 로그인 사용자, 입주민 = 익명 로그인 사용자
+    function isAdmin() {
+      return request.auth != null
+          && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    match /sites/{site} {
+
+      // 세대 원본(이름·연락처·비번) — 관리자만
+      match /units/{unitId} {
+        allow read, write: if isAdmin();
+      }
+
+      // 관리자 전용 설정(기사 연락처 포함)
+      match /meta/config {
+        allow read, write: if isAdmin();
+      }
+      // 예약 페이지가 읽는 공개 정보 — 개인정보 없음(작업일·시간대·정원)
+      match /meta/public {
+        allow read: if request.auth != null;
+        allow write: if isAdmin();
+      }
+      // 본인확인용 해시 목록 — 원본 번호는 들어있지 않음
+      match /meta/roster {
+        allow read: if request.auth != null;
+        allow write: if isAdmin();
+      }
+      // 시간대별 예약 인원 (숫자만)
+      match /meta/avail {
+        allow read: if request.auth != null;
+        allow write: if isAdmin();
+      }
+
+      // 입주민 예약 접수함
+      //  문서 ID = 호실_연락처뒷4자리 → 뒷4자리를 모르면 남의 예약을 열 수 없습니다
+      //  목록 조회(list)는 관리자만 → 통째로 긁어갈 수 없습니다
+      match /bookings/{bookingId} {
+        allow get, create, update: if request.auth != null;
+        allow list, delete: if isAdmin();
+      }
+    }
+  }
+}`;
+function copyRules(){
+  navigator.clipboard ? navigator.clipboard.writeText(RULES_TEXT).then(()=>toast('규칙을 복사했습니다'))
+                      : toast('길게 눌러 복사하세요');
+}
+
+/* ═══════════════════════════════════════════
+   Firebase
+   ═══════════════════════════════════════════ */
+const FB_VER = '10.12.2';
+async function initFirebase(){
+  if(!fbConfig) { renderCloudStatus(); return; }
+  try{
+    const [{ initializeApp }, authMod, fsMod] = await Promise.all([
+      import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-app.js`),
+      import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-auth.js`),
+      import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-firestore.js`),
+    ]);
+    window._fb = Object.assign({}, authMod, fsMod);
+    firebaseApp = initializeApp(fbConfig);
+    firebaseAuth = authMod.getAuth(firebaseApp);
+    firebaseDB = fsMod.getFirestore(firebaseApp);
+    try{ await fsMod.enableIndexedDbPersistence(firebaseDB); }catch(e){ /* 다중 탭이면 무시 */ }
+    try{ await authMod.setPersistence(firebaseAuth, authMod.browserLocalPersistence); }catch(e){}
+
+    authMod.onAuthStateChanged(firebaseAuth, user=>{
+      cloudUser = (user && !user.isAnonymous) ? user : null;
+      renderCloudStatus();
+      if(cloudUser) subscribeCloud();
+      else unsubscribeCloud();
+    });
+    try{ await authMod.getRedirectResult(firebaseAuth); }catch(e){}
+  }catch(e){
+    console.error('Firebase 초기화 실패', e);
+    toast('Firebase 초기화 실패: '+e.message, 4000);
+  }
+}
+function saveFbConfig(){
+  const raw = $('fbConfigInput').value.trim();
+  if(!raw) return toast('설정을 붙여넣으세요');
+  try{
+    // { apiKey: "..." } 형태(따옴표 없는 키)도 허용
+    let json = raw.replace(/^\s*const\s+\w+\s*=\s*/,'').replace(/;\s*$/,'');
+    let cfg;
+    try{ cfg = JSON.parse(json); }
+    catch(e){ cfg = JSON.parse(json.replace(/([{,]\s*)([A-Za-z0-9_]+)\s*:/g,'$1"$2":').replace(/'/g,'"')); }
+    if(!cfg.apiKey || !cfg.projectId) throw new Error('apiKey / projectId 가 없습니다');
+    fbConfig = cfg;
+    localStorage.setItem(LS_FB, JSON.stringify(cfg));
+    toast('저장했습니다. 앱을 다시 불러옵니다', 1600);
+    setTimeout(()=>location.reload(), 1200);
+  }catch(e){ alert('설정 형식이 올바르지 않습니다.\n\n'+e.message); }
+}
+function renderCloudStatus(){
+  const box = $('cloudStatus'), btns = $('cloudBtns');
+  if(!box) return;
+  if(!fbConfig){
+    box.innerHTML = `<div class="cs-l1">⚪ 미설정</div><div class="cs-l2">아래에서 firebaseConfig 를 넣으면 여러 사람이 실시간으로 같이 봅니다.</div>`;
+    btns.innerHTML = ''; $('syncBtn').style.display='none';
+    return;
+  }
+  $('syncBtn').style.display='';
+  if(cloudUser){
+    box.innerHTML = `<div class="cs-l1">🟢 동기화 중</div>
+      <div class="cs-l2">${esc(cloudUser.email||'')}<br>마지막 동기화: ${lastSyncAt?new Date(lastSyncAt).toLocaleString('ko-KR'):'—'}</div>`;
+    btns.innerHTML = `<button class="btn btn-outline btn-full btn-sm" onclick="cloudSignOut()">로그아웃</button>`;
+  } else {
+    box.innerHTML = `<div class="cs-l1">🟡 로그인 필요</div><div class="cs-l2">Google 계정으로 로그인하세요.</div>`;
+    btns.innerHTML = `<button class="btn btn-primary btn-full btn-sm" onclick="cloudSignIn()">Google 로그인</button>`;
+  }
+}
+async function cloudSignIn(){
+  if(!firebaseAuth) return toast('Firebase 설정을 먼저 저장하세요');
+  const { GoogleAuthProvider, signInWithPopup, signInWithRedirect } = window._fb;
+  const p = new GoogleAuthProvider();
+  try{ await signInWithPopup(firebaseAuth, p); }
+  catch(e){
+    if(['auth/popup-blocked','auth/operation-not-supported-in-this-environment','auth/popup-closed-by-user'].includes(e.code)){
+      try{ await signInWithRedirect(firebaseAuth, p); }catch(e2){ toast('로그인 실패: '+e2.message, 4000); }
+    } else toast('로그인 실패: '+e.message, 4000);
+  }
+}
+async function cloudSignOut(){
+  unsubscribeCloud();
+  try{ await window._fb.signOut(firebaseAuth); }catch(e){}
+  cloudUser=null; renderCloudStatus();
+}
+function unsubscribeCloud(){
+  [unsubUnits, unsubConfig, unsubBookings].forEach(f=>{ if(f) try{f();}catch(e){} });
+  unsubUnits=unsubConfig=unsubBookings=null;
+}
+function subscribeCloud(){
+  if(!firebaseDB || !cloudUser) return;
+  unsubscribeCloud();
+  const { collection, doc, onSnapshot } = window._fb;
+
+  unsubUnits = onSnapshot(collection(firebaseDB,'sites',SITE_ID,'units'), snap=>{
+    cloudApplying = true;
+    snap.docChanges().forEach(ch=>{
+      const d = ch.doc.data();
+      if(ch.type==='removed'){
+        units = units.filter(u=>u.id!==ch.doc.id);
+        return;
+      }
+      const i = units.findIndex(u=>u.id===ch.doc.id);
+      if(i<0) units.push(normalizeUnit(d));
+      else if((d.updatedAt||0) >= (units[i].updatedAt||0)) units[i] = normalizeUnit(d);
+    });
+    cloudApplying = false;
+    lastSyncAt = Date.now();
+    saveLocal(); renderAll();
+  }, err=>{ console.error(err); toast('동기화 오류: '+err.code, 4000); });
+
+  unsubConfig = onSnapshot(doc(firebaseDB,'sites',SITE_ID,'meta','config'), snap=>{
+    if(!snap.exists()){ pushConfig(); return; }
+    const d = snap.data();
+    if((d.updatedAt||0) > (config.updatedAt||0)){
+      config = Object.assign(defaultConfig(), d);
+      saveLocal(); renderAll();
+    }
+    lastSyncAt = Date.now();
+  }, err=>console.error(err));
+
+  // 입주민 예약 접수함 → 세대에 반영
+  unsubBookings = onSnapshot(collection(firebaseDB,'sites',SITE_ID,'bookings'), snap=>{
+    let n = 0;
+    snap.docChanges().forEach(ch=>{
+      if(ch.type==='removed') return;
+      if(applyBooking(ch.doc.data())) n++;
+    });
+    if(n){ saveLocal(); renderAll(); toast(`📩 입주민 예약 ${n}건이 반영되었습니다`, 3200); }
+  }, err=>console.error(err));
+}
+// 입주민이 넣은 예약을 세대 레코드에 반영
+function applyBooking(b){
+  if(!b || !b.ho) return false;
+  const u = units.find(x=>String(x.ho)===String(b.ho));
+  if(!u) return false;
+  if((b.at||0) <= (u.bookedAtMs||0)) return false;   // 이미 반영된 건
+  if(u.status==='done') return false;                 // 완료된 세대는 건드리지 않음
+  u.date = b.date||'';
+  u.slot = b.slot||'';
+  u.presence = b.presence || u.presence;
+  if(b.pin) u.pin = b.pin;
+  if(b.name && !u.name) u.name = b.name;
+  if(b.note) u.note = (u.note? u.note+' / ':'') + '[입주민] ' + b.note;
+  u.bookedBy = 'self';
+  u.bookedAtMs = b.at||Date.now();
+  u.bookedAt = new Date(b.at||Date.now()).toLocaleString('ko-KR');
+  if(u.date && u.slot) u.status = 'booked';
+  u.updatedAt = Date.now();
+  pushUnit(u);
+  return true;
+}
+async function pushUnit(u){
+  if(!firebaseDB || !cloudUser || cloudApplying) return;
+  try{
+    const { doc, setDoc } = window._fb;
+    await setDoc(doc(firebaseDB,'sites',SITE_ID,'units',u.id), JSON.parse(JSON.stringify(u)));
+    schedulePublish();
+  }catch(e){ console.error('업로드 실패', u.id, e); }
+}
+async function deleteUnitCloud(id){
+  if(!firebaseDB || !cloudUser) return;
+  try{
+    const { doc, deleteDoc } = window._fb;
+    await deleteDoc(doc(firebaseDB,'sites',SITE_ID,'units',id));
+  }catch(e){ console.error(e); }
+}
+async function pushConfig(){
+  if(!firebaseDB || !cloudUser) return;
+  try{
+    const { doc, setDoc } = window._fb;
+    await setDoc(doc(firebaseDB,'sites',SITE_ID,'meta','config'), JSON.parse(JSON.stringify(config)));
+    schedulePublish();
+  }catch(e){ console.error(e); }
+}
+/* ── 입주민 예약 페이지가 읽을 공개 정보 ──
+   meta/public : 작업일·시간대·정원 (개인정보 없음)
+   meta/avail  : 시간대별 현재 예약 인원 (숫자만)
+   meta/roster : 본인확인용 해시 (호실+뒷4자리 → SHA-256). 원본 번호는 올라가지 않음 */
+async function sha256hex(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function availCounts(){
+  const avail = {};
+  config.days.filter(d=>d.date).forEach(d=>{
+    slotsForDate(d.date).forEach(s=>{
+      avail[d.date+'|'+s.id] = units.filter(u=>u.date===d.date && u.slot===s.id).length;
+    });
+  });
+  return avail;
+}
+let publishTimer = null;
+function schedulePublish(){
+  clearTimeout(publishTimer);
+  publishTimer = setTimeout(publishPublic, 2500);
+}
+async function publishPublic(){
+  if(!firebaseDB || !cloudUser) return;
+  try{
+    const { doc, setDoc } = window._fb;
+    await setDoc(doc(firebaseDB,'sites',SITE_ID,'meta','public'), {
+      siteName: config.siteName,
+      bookingOpen: !!config.bookingOpen,
+      days: config.days.filter(d=>d.date).map(d=>({date:d.date})),
+      slots: config.slots,
+      at: Date.now(),
+    });
+    await setDoc(doc(firebaseDB,'sites',SITE_ID,'meta','avail'), { counts: availCounts(), at: Date.now() });
+
+    const hashes = {};
+    for(const u of units){
+      if(u.status==='vacant') continue;
+      if(u.phone4 && u.phone4.length===4){
+        hashes[u.ho] = await sha256hex(`${SITE_ID}:${u.ho}:${u.phone4}`);
+      } else {
+        hashes[u.ho] = '';   // 연락처 미등록 세대 → 뒷4자리 확인 없이 진행
+      }
+    }
+    await setDoc(doc(firebaseDB,'sites',SITE_ID,'meta','roster'), { hashes, at: Date.now() });
+  }catch(e){ console.error('공개정보 발행 실패', e); }
+}
+async function forceSync(){
+  if(!firebaseDB || !cloudUser) return toast('먼저 로그인하세요');
+  $('syncBtn').textContent='동기화중';
+  try{
+    const { collection, getDocs, doc, getDoc } = window._fb;
+    const snap = await getDocs(collection(firebaseDB,'sites',SITE_ID,'units'));
+    cloudApplying = true;
+    snap.forEach(d=>{
+      const data = d.data();
+      const i = units.findIndex(u=>u.id===d.id);
+      if(i<0) units.push(normalizeUnit(data));
+      else if((data.updatedAt||0) >= (units[i].updatedAt||0)) units[i]=normalizeUnit(data);
+    });
+    cloudApplying = false;
+    const bs = await getDocs(collection(firebaseDB,'sites',SITE_ID,'bookings'));
+    bs.forEach(d=>applyBooking(d.data()));
+    await publishPublic();
+    lastSyncAt = Date.now();
+    saveLocal(); renderAll();
+    toast('동기화 완료');
+  }catch(e){ toast('동기화 실패: '+e.message, 4000); }
+  $('syncBtn').textContent='동기화';
+  subscribeCloud();
+}
+
+// 예약 가능 정보는 주기적으로 갱신 (예약 페이지가 정확한 잔여석을 보도록)
+setInterval(()=>{ if(cloudUser) publishPublic(); }, 60000);
+
+/* ═══════════════════════════════════════════
+   시작
+   ═══════════════════════════════════════════ */
+loadLocal();
+renderAll();
+initFirebase();
+$('unitModal').addEventListener('click', e=>{ if(e.target.id==='unitModal') closeUnitModal(); });
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
