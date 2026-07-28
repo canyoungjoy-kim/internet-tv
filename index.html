@@ -184,6 +184,11 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
   .sec{border:none;box-shadow:none;margin-bottom:8px}
   .sec-title{background:#eee;border-bottom:1px solid #999}
   .pgbreak{page-break-after:always}
+  table.tbl tr{page-break-inside:avoid}
+  table.tbl thead{display:table-header-group}
+  .ws-floor{page-break-before:always}
+  .ws-floor:first-of-type{page-break-before:auto}
+  #pushBanner{display:none!important}
 }
 .print-only{display:none}
 </style>
@@ -305,6 +310,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
             <div class="fg"><label>기사</label><select id="wsTech" onchange="renderWorksheet()"></select></div>
           </div>
           <button class="btn btn-primary btn-full" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>
+          <button class="btn btn-outline btn-full" onclick="copyDailySummary()">📋 이 날짜 마감 요약 복사</button>
         </div>
       </div>
       <div id="wsBody"></div>
@@ -337,6 +343,8 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
         <div class="sec-body">
           <button class="btn btn-outline btn-full" onclick="exportCsv()">⬇ 전체 세대 CSV 내려받기</button>
           <button class="btn btn-outline btn-full" onclick="exportEquipCsv()">⬇ 장비 회수대장 CSV (정산용)</button>
+          <button class="btn btn-outline btn-full" onclick="exportUnbookedCsv()">⬇ 미예약 세대 CSV (독촉 문자용)</button>
+          <button class="btn btn-outline btn-full" onclick="copyUnbookedPhones()">📋 미예약 세대 연락처만 복사</button>
           <div class="fg">
             <label>입주민 명단 CSV 올리기 (호실,이름,연락처)</label>
             <input type="file" id="csvFile" accept=".csv,text/csv" onchange="importCsv(event)">
@@ -563,6 +571,8 @@ let cloudUser = null;
 let unsubUnits=null, unsubConfig=null, unsubBookings=null, unsubContacts=null;
 let cloudApplying = false;
 let lastSyncAt = null;
+let badBookings = [];      // 본인확인이 어긋난 예약 (수동 확인 필요)
+let failedPushes = new Map();  // id → 재시도 대기 중인 세대
 
 /* ═══════════════════════════════════════════
    유틸
@@ -763,6 +773,13 @@ function saveLocal(){
     else localStorage.removeItem(LS_CONTACTS);
   }catch(e){ toast('⚠️ 저장 공간이 부족합니다'); }
 }
+// 서버에 저장된 상태를 기준점으로 기억 (부분 병합 저장에 씁니다)
+function markServerState(u){
+  const c = JSON.parse(JSON.stringify(u));
+  delete c._srv;
+  u._srv = c;
+  return u;
+}
 function normalizeUnit(u){
   if(!u.ret) u.ret = {};
   if(!u.ins) u.ins = {};
@@ -922,6 +939,41 @@ function sortBySlotThenHo(a,b){
   if(sa!==sb) return sa<sb?-1:1;
   return String(a.ho).localeCompare(String(b.ho));
 }
+// 목록에서 한 번에 완료 처리 (되돌리기 제공)
+let lastQuickDone = null;
+function quickDone(ev, id){
+  ev.stopPropagation();
+  const u = units.find(x=>x.id===id);
+  if(!u) return;
+  lastQuickDone = JSON.parse(JSON.stringify(u));
+  delete lastQuickDone._srv;
+  EQUIP_RET.forEach(e=>u.ret[e.key]=true);
+  EQUIP_INS.forEach(e=>u.ins[e.key]=true);
+  u.status='done';
+  if(u.pin) u.pin='';
+  u.updatedAt=Date.now();
+  saveLocal(); pushUnit(u); renderAll();
+  const t=$('toast');
+  t.innerHTML = `${esc(u.ho)}호 작업완료 <button onclick="undoQuickDone()" style="margin-left:9px;
+    background:#fff;color:#1e293b;border:none;border-radius:6px;padding:4px 10px;font-weight:800;
+    font-size:14px;cursor:pointer">되돌리기</button>`;
+  t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'), 6000);
+}
+function undoQuickDone(){
+  if(!lastQuickDone) return;
+  const i = units.findIndex(x=>x.id===lastQuickDone.id);
+  if(i>=0){
+    const srv = units[i]._srv;
+    units[i] = normalizeUnit(lastQuickDone);
+    units[i]._srv = srv;
+    units[i].updatedAt = Date.now();
+    saveLocal(); pushUnit(units[i]); renderAll();
+  }
+  lastQuickDone = null;
+  $('toast').classList.remove('show');
+  toast('되돌렸습니다');
+}
 function unitRowHtml(u, showSlot){
   const st = STATUS[u.status]||STATUS.todo;
   const bits = [];
@@ -936,6 +988,9 @@ function unitRowHtml(u, showSlot){
       <div class="ul-meta">${esc(bits.filter(Boolean).join(' · ')||'—')}</div>
     </div>
     <span class="badge ${st.cls}">${st.label}</span>
+    ${u.status!=='done' && u.status!=='vacant'
+      ? `<button class="btn btn-outline btn-sm" style="flex-shrink:0;padding:7px 10px;font-weight:800"
+           onclick="quickDone(event,'${u.id}')" title="장비 전량 회수·설치 + 작업완료">✓</button>` : ''}
   </div>`;
 }
 
@@ -1088,6 +1143,8 @@ function openUnit(id){
           <div class="fg"><label>시간대</label><select id="umSlot"></select></div>
         </div>
         <div class="fg"><label>담당 기사</label><select id="umTech">${techOpts}</select></div>
+        ${isAdmin() ? `<button class="btn btn-outline btn-full btn-sm" type="button"
+            onclick="rebookNext()">🔄 남은 자리 중 가장 빠른 시간으로 재예약</button>` : ''}
         ${u.bookedBy==='self' ? `<div class="info">입주민이 예약 페이지에서 직접 신청했습니다${u.bookedAt?` (${esc(u.bookedAt)})`:''}</div>` : ''}
       </div>
     </div>
@@ -1165,6 +1222,27 @@ function fillSlotSelect(dateStr, cur){
     const full = n >= (Number(s.cap)||0);
     return `<option value="${s.id}" ${cur===s.id?'selected':''}>${s.from}~${s.to} (${n}/${s.cap})${full?' 정원초과':''}</option>`;
   }).join('');
+}
+/* 부재·재방문 세대를 남은 자리 중 가장 빠른 시간으로 옮깁니다 */
+function nextFreeSlot(afterDate){
+  const t = todayStr();
+  const days = config.days.map(d=>d.date).filter(d=>d && d>=t).sort();
+  for(const d of days){
+    for(const s of slotsForDate(d)){
+      const n = units.filter(u=>u.date===d && u.slot===s.id && u.id!==editingUnitId).length;
+      if(n < (Number(s.cap)||0)) return { date:d, slot:s.id, label:`${fmtDate(d)} ${s.from}~${s.to}` };
+    }
+  }
+  return null;
+}
+function rebookNext(){
+  const free = nextFreeSlot();
+  if(!free) return alert('남은 자리가 없습니다.\n설정에서 작업일이나 정원을 늘려주세요.');
+  if(!confirm(`${free.label} 으로 옮길까요?`)) return;
+  $('umDate').value = free.date;
+  fillSlotSelect(free.date, free.slot);
+  $('umSlot').value = free.slot;
+  toast(`${free.label} 선택됨 — 저장을 눌러 확정하세요`, 4000);
 }
 function closeUnitModal(){ $('unitModal').classList.remove('open'); editingUnitId=null; }
 
@@ -1566,6 +1644,62 @@ function exportEquipCsv(){
   });
   downloadCsv(`장비회수대장_${todayStr()}.csv`, rows);
 }
+// 아직 예약이 없는 세대 (완료·보류·공실 제외)
+function unbookedUnits(){
+  return units.filter(u=>!u.date && !['done','hold','vacant'].includes(u.status))
+              .sort((a,b)=>a.floor-b.floor||String(a.ho).localeCompare(String(b.ho)));
+}
+function exportUnbookedCsv(){
+  const list = unbookedUnits();
+  if(!list.length) return toast('미예약 세대가 없습니다');
+  const rows = [['호실','이름','연락처','상태','재실유형','메모']];
+  list.forEach(u=>rows.push([u.ho, nameOf(u), phoneOf(u), STATUS[u.status].label,
+                             PRESENCE[u.presence]||'', u.note||'']));
+  downloadCsv(`미예약세대_${todayStr()}.csv`, rows);
+}
+function copyUnbookedPhones(){
+  const list = unbookedUnits().filter(u=>phoneOf(u));
+  if(!list.length) return toast('연락처가 있는 미예약 세대가 없습니다');
+  const text = list.map(u=>phoneOf(u)).join(', ');
+  const done = ()=>toast(`${list.length}건 복사 — 문자앱 받는사람에 붙여넣으세요`, 4000);
+  if(navigator.clipboard) navigator.clipboard.writeText(text).then(done).catch(()=>prompt('복사하세요', text));
+  else prompt('복사하세요', text);
+}
+
+// ── 11. 일일 마감 요약 ──
+function dailySummary(date){
+  const list = units.filter(u=>u.date===date);
+  const c = k=>list.filter(u=>u.status===k).length;
+  const miss = EQUIP_RET.map(e=>{
+    const n = list.filter(u=>u.status==='done' && !u.ret[e.key]).length;
+    return n ? `${e.label} ${n}` : null;
+  }).filter(Boolean);
+  const absent = list.filter(u=>u.status==='absent').map(u=>u.ho+'호');
+  const left = list.filter(u=>!['done','hold','vacant'].includes(u.status)).length;
+  return [
+    `[${config.siteName}] 인터넷·TV 장비교체 ${fmtDate(date)} 작업 결과`,
+    ``,
+    `· 예정 ${list.length}세대 / 완료 ${c('done')}세대`,
+    `· 부재·재방문 ${c('absent')}세대${absent.length?' ('+absent.join(', ')+')':''}`,
+    `· 보류·거부 ${c('hold')}세대`,
+    `· 미처리 ${left}세대`,
+    ``,
+    `· 회수 장비: ${EQUIP_RET.map(e=>e.label+' '+list.filter(u=>u.ret[e.key]).length).join(' / ')}`,
+    `· 설치 장비: ${EQUIP_INS.map(e=>e.label+' '+list.filter(u=>u.ins[e.key]).length).join(' / ')}`,
+    miss.length ? `· 미회수: ${miss.join(', ')}` : `· 미회수 없음`,
+    ``,
+    `· 전체 진행률 ${activeUnits().length?Math.round(units.filter(u=>u.status==='done').length/activeUnits().length*100):0}%`
+    + ` (${units.filter(u=>u.status==='done').length}/${activeUnits().length}세대)`,
+  ].join('\n');
+}
+function copyDailySummary(){
+  const date = $('wsDate').value;
+  if(!date) return toast('작업일을 선택하세요');
+  const text = dailySummary(date);
+  const done = ()=>toast('마감 요약을 복사했습니다 — 문자·카톡에 붙여넣으세요', 4000);
+  if(navigator.clipboard) navigator.clipboard.writeText(text).then(done).catch(()=>prompt('복사하세요', text));
+  else prompt('복사하세요', text);
+}
 function parseCsv(text){
   const rows=[]; let row=[], cell='', q=false;
   for(let i=0;i<text.length;i++){
@@ -1850,8 +1984,20 @@ service cloud.firestore {
       //  문서 ID = 호실_연락처뒷4자리 → 뒷4자리를 모르면 남의 예약을 열 수 없습니다
       //  목록 조회(list)는 관리자만 → 통째로 긁어갈 수 없습니다
       match /bookings/{bookingId} {
-        allow get, create, update: if request.auth != null;
+        allow get: if request.auth != null;
+        // 접수가 열려 있을 때만, 그리고 문서ID가 호실_뒷4자리와 일치할 때만
+        allow create, update: if request.auth != null
+          && bookingId == request.resource.data.ho + '_' + request.resource.data.phone4
+          && (isAdmin() || isWorker()
+              || get(/databases/$(db)/documents/sites/$(site)/meta/public).data.bookingOpen == true);
         allow list, delete: if isAdmin();
+      }
+
+      // 시간대별 예약 인원 — 정원 초과를 서버에서 막기 위한 카운터
+      //  입주민이 트랜잭션으로 직접 올리고 내립니다(개인정보 없음)
+      match /slots/{slotId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null;
       }
     }
   }
@@ -2027,8 +2173,9 @@ function subscribeCloud(){
       }
       const hadPersonal = !!(d.name || d.phone);   // 옛 구조로 올라와 있던 문서
       const i = units.findIndex(u=>u.id===ch.doc.id);
-      if(i<0) units.push(normalizeUnit(d));
-      else if((d.updatedAt||0) >= (units[i].updatedAt||0)) units[i] = normalizeUnit(d);
+      if(i<0) units.push(markServerState(normalizeUnit(d)));
+      else if((d.updatedAt||0) >= (units[i].updatedAt||0)) units[i] = markServerState(normalizeUnit(d));
+      else markServerState(units[i]);   // 서버가 옛것이어도 기준점은 갱신
       if(hadPersonal) legacy.push(ch.doc.id);
     });
     cloudApplying = false;
@@ -2086,6 +2233,28 @@ function applyBooking(b){
   if(!u) return false;
   if((b.at||0) <= (u.bookedAtMs||0)) return false;   // 이미 반영된 건
   if(u.status==='done') return false;                 // 완료된 세대는 건드리지 않음
+
+  /* 본인확인 재검증 — 화면에서만 막지 않고 서버 자료와 대조합니다.
+     등록된 뒷 4자리와 다르면 반영하지 않고 소장님께 알립니다. */
+  const reg = ctOf(u).phone4;
+  if(reg && b.phone4 && String(b.phone4) !== String(reg)){
+    if(!badBookings.some(x=>x.ho===b.ho && x.at===b.at)){
+      badBookings.push({ ho:b.ho, phone4:b.phone4, at:b.at });
+      renderAll();
+    }
+    return false;
+  }
+
+  // 입주민이 취소한 예약
+  if(b.cancelled){
+    u.date=''; u.slot='';
+    if(u.status==='booked') u.status='contacted';
+    u.bookedAtMs = b.at||Date.now();
+    u.note = (u.note? u.note+' / ':'') + '[입주민] 예약 취소';
+    u.updatedAt = Date.now();
+    pushUnit(u);
+    return true;
+  }
   u.date = b.date||'';
   u.slot = b.slot||'';
   u.presence = b.presence || u.presence;
@@ -2106,9 +2275,61 @@ async function pushUnit(u){
     const { doc, setDoc } = window._fb;
     const clean = JSON.parse(JSON.stringify(u));
     delete clean.name; delete clean.phone; delete clean.phone4;   // 개인정보는 여기에 담지 않음
-    await setDoc(doc(firebaseDB,'sites',SITE_ID,'units',u.id), clean);
+    delete clean._srv;
+
+    /* 같은 세대를 두 사람이 동시에 고쳐도 서로의 입력이 사라지지 않도록,
+       바뀐 항목만 골라 병합 저장합니다. (예: A는 회수 체크, B는 메모 입력) */
+    const srv = u._srv;
+    let payload = clean, opts = undefined;
+    if(srv){
+      const diff = {};
+      Object.keys(clean).forEach(k=>{
+        if(JSON.stringify(clean[k]) !== JSON.stringify(srv[k])) diff[k] = clean[k];
+      });
+      if(!Object.keys(diff).length) return;      // 바뀐 게 없으면 쓰지 않음
+      diff.updatedAt = clean.updatedAt;
+      payload = diff; opts = { merge:true };
+    }
+    await setDoc(doc(firebaseDB,'sites',SITE_ID,'units',u.id), payload, opts);
+    if(failedPushes.delete(u.id)) renderPushBanner();
     schedulePublish();
-  }catch(e){ console.error('업로드 실패', u.id, e); }
+  }catch(e){
+    console.error('업로드 실패', u.id, e);
+    failedPushes.set(u.id, u.id);
+    renderPushBanner();
+    toast(`⚠️ ${u.ho}호 저장 실패 — ${pushErrText(e)}`, 6000);
+  }
+}
+function pushErrText(e){
+  if(e && e.code === 'permission-denied') return '권한이 없습니다. 관리자에게 문의하세요';
+  if(e && e.code === 'unavailable') return '연결이 끊겼습니다. 신호가 잡히면 자동으로 다시 올립니다';
+  return (e && (e.code || e.message)) || '알 수 없는 오류';
+}
+// 실패 건이 남아 있으면 화면 위에 눈에 띄게 알립니다
+function renderPushBanner(){
+  let el = $('pushBanner');
+  if(!failedPushes.size){ if(el) el.remove(); return; }
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'pushBanner';
+    el.style.cssText = 'position:fixed;left:0;right:0;top:52px;z-index:60;background:#dc2626;color:#fff;'
+      + 'padding:9px 12px;font-size:15px;font-weight:700;display:flex;align-items:center;gap:9px';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = `<span style="flex:1">⚠️ 저장되지 않은 세대 ${failedPushes.size}건</span>
+    <button onclick="retryPushes()" style="background:#fff;color:#dc2626;border:none;border-radius:7px;
+      padding:6px 11px;font-size:14px;font-weight:800;cursor:pointer">다시 시도</button>`;
+}
+async function retryPushes(){
+  const ids = [...failedPushes.keys()];
+  if(!ids.length) return;
+  toast(`${ids.length}건 다시 올리는 중…`);
+  for(const id of ids){
+    const u = units.find(x=>x.id===id);
+    if(u) await pushUnit(u); else failedPushes.delete(id);
+  }
+  renderPushBanner();
+  if(!failedPushes.size) toast('✅ 모두 저장되었습니다');
 }
 // 이름·연락처는 별도 컬렉션 — 기사 계정은 규칙에서 읽기가 막혀 있습니다
 async function pushContact(ho){
@@ -2157,7 +2378,7 @@ function availCounts(){
 let publishTimer = null;
 let publishDirty = false;
 // 마지막으로 올린 내용의 지문 — 바뀐 것이 없으면 쓰기를 건너뜁니다(무료 한도 절약)
-let lastPub = { pub:'', avail:'', roster:'' };
+let lastPub = { pub:'', avail:'', roster:'', slots:{} };
 
 function schedulePublish(){
   publishDirty = true;
@@ -2210,9 +2431,24 @@ async function publishPublic(force){
       await setDoc(doc(firebaseDB,'sites',SITE_ID,'meta','roster'), { hashes, at: Date.now() });
       lastPub.roster = rSig;
     }
+    await reconcileSlots(counts);
   }catch(e){
-    publishDirty = true;   // 실패했으면 다음 차례에 다시 시도
+    publishDirty = true;
     console.error('공개정보 발행 실패', e);
+  }
+}
+/* 시간대 카운터를 실제 배정 현황과 맞춥니다.
+   (사무소에서 일괄 배정한 건도 예약 페이지의 잔여석에 반영되도록) */
+async function reconcileSlots(counts){
+  if(!isAdmin()) return;
+  const { doc, setDoc } = window._fb;
+  for(const [key, n] of Object.entries(counts)){
+    const [date, slot] = key.split('|');
+    if(lastPub.slots[key] === n) continue;
+    const s = slotById(date, slot);
+    await setDoc(doc(firebaseDB,'sites',SITE_ID,'slots', `${date}__${slot}`),
+                 { date, slot, cap: Number(s && s.cap)||0, n, at: Date.now() });
+    lastPub.slots[key] = n;
   }
 }
 async function forceSync(){
