@@ -392,10 +392,12 @@ table.tbl td.num{text-align:right;font-weight:700;font-variant-numeric:tabular-n
       <div class="sec">
         <div class="sec-title">시간대 설정</div>
         <div class="sec-body">
-          <div class="fg"><label style="font-size:13px;color:var(--text)">평일 시간대</label><div id="cfgSlotsWeekday"></div>
+          <div class="fg"><label style="font-size:13px;color:var(--text)">평일 시간대 (월~금)</label><div id="cfgSlotsweekday"></div>
             <button class="btn btn-outline btn-sm" onclick="addSlot('weekday')">+ 평일 시간대 추가</button></div>
-          <div class="fg"><label style="font-size:13px;color:var(--text)">주말 시간대</label><div id="cfgSlotsWeekend"></div>
-            <button class="btn btn-outline btn-sm" onclick="addSlot('weekend')">+ 주말 시간대 추가</button></div>
+          <div class="fg"><label style="font-size:13px;color:var(--text)">토요일 시간대</label><div id="cfgSlotssat"></div>
+            <button class="btn btn-outline btn-sm" onclick="addSlot('sat')">+ 토요일 시간대 추가</button></div>
+          <div class="fg"><label style="font-size:13px;color:var(--text)">일요일 시간대</label><div id="cfgSlotssun"></div>
+            <button class="btn btn-outline btn-sm" onclick="addSlot('sun')">+ 일요일 시간대 추가</button></div>
           <div class="help"><strong>정원</strong>은 그 시간대에 받을 수 있는 세대 수입니다. 기사 인원 × 시간당 처리 세대로 잡으세요. 정원이 차면 입주민 예약 페이지에서 그 시간대가 <strong>마감</strong>으로 표시됩니다.</div>
           <div id="capCheck"></div>
         </div>
@@ -567,11 +569,17 @@ function defaultConfig(){
         { id:'w5', from:'17:00', to:'18:00', cap:7  },
         { id:'w6', from:'19:00', to:'20:00', cap:7  },
       ],
-      weekend: [
+      sat: [
         { id:'e1', from:'09:00', to:'11:00', cap:18 },
         { id:'e2', from:'11:00', to:'13:00', cap:18 },
         { id:'e3', from:'14:00', to:'16:00', cap:18 },
         { id:'e4', from:'16:00', to:'18:00', cap:18 },
+      ],
+      sun: [
+        { id:'u1', from:'09:00', to:'11:00', cap:18 },
+        { id:'u2', from:'11:00', to:'13:00', cap:18 },
+        { id:'u3', from:'14:00', to:'16:00', cap:18 },
+        { id:'u4', from:'16:00', to:'18:00', cap:18 },
       ],
     },
     // 2~4층 35세대, 5~10층 36세대 (설정에서 변경 가능)
@@ -584,9 +592,41 @@ function defaultConfig(){
   };
 }
 
+const SLOT_KIND_LABEL = { weekday:'평일', sat:'토요일', sun:'일요일' };
+// 날짜가 평일/토요일/일요일 중 어느 시간표를 쓰는지
+function slotKindOf(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  if(isNaN(d)) return 'weekday';
+  const g = d.getDay();
+  return g===6 ? 'sat' : (g===0 ? 'sun' : 'weekday');
+}
 function slotsForDate(dateStr){
   if(!config) return [];
-  return isWeekendDate(dateStr) ? (config.slots.weekend||[]) : (config.slots.weekday||[]);
+  return config.slots[slotKindOf(dateStr)] || [];
+}
+
+/* 예전 설정(평일/주말 2종)을 평일·토·일 3종으로 자동 변환.
+   토요일은 기존 시간대 ID를 그대로 물려받아 이미 잡힌 예약이 유지되고,
+   일요일은 새 ID를 받되 그 날짜에 잡혀 있던 예약을 같은 순서로 옮겨줍니다. */
+function migrateSlots(cfg, unitList){
+  if(!cfg || !cfg.slots) return cfg;
+  const s = cfg.slots;
+  if(!s.weekend) return cfg;                 // 이미 변환됨
+  if(!s.sat) s.sat = s.weekend.map(x => Object.assign({}, x));
+  if(!s.sun) {
+    s.sun = s.weekend.map(x => Object.assign({}, x, { id: 'u_' + x.id }));
+    const idMap = {};
+    s.weekend.forEach((x,i) => { idMap[x.id] = s.sun[i].id; });
+    (unitList||[]).forEach(u => {
+      if(u.date && u.slot && slotKindOf(u.date)==='sun' && idMap[u.slot]){
+        u.slot = idMap[u.slot];
+        u.updatedAt = Date.now();
+      }
+    });
+  }
+  delete s.weekend;
+  cfg.updatedAt = Date.now();
+  return cfg;
 }
 function slotById(dateStr, id){
   return slotsForDate(dateStr).find(s=>s.id===id) || null;
@@ -617,6 +657,7 @@ function loadLocal(){
     fbConfig = f ? JSON.parse(f) : null;
   }catch(e){ fbConfig=null; }
   units.forEach(normalizeUnit);
+  migrateSlots(config, units);
 }
 function saveLocal(){
   try{
@@ -1041,7 +1082,7 @@ function renderSched(){
       const unassigned = dayList.filter(u=>!u.slot).length;
       return `<div class="slot-day">
         <div class="slot-day-head">
-          <span>${fmtDate(d.date)} ${isWeekendDate(d.date)?'주말':'평일'}</span>
+          <span>${fmtDate(d.date)} ${SLOT_KIND_LABEL[slotKindOf(d.date)]}</span>
           <span class="sd-cnt">${dayList.length} / 정원 ${cap}</span>
         </div>
         ${rows || '<div class="slot-row">시간대가 없습니다</div>'}
@@ -1376,13 +1417,14 @@ function renderSettings(){
   $('cfgDays').innerHTML = config.days.map((d,i)=>`
     <div style="display:flex;gap:7px;align-items:center;margin-bottom:7px">
       <input type="date" value="${escA(d.date||'')}" onchange="setDay(${i}, this.value)" style="flex:1">
-      <span style="font-size:13px;font-weight:800;color:var(--muted);min-width:52px">${d.date?(isWeekendDate(d.date)?'주말':'평일'):''}</span>
+      <span style="font-size:13px;font-weight:800;color:var(--muted);min-width:52px">${d.date?SLOT_KIND_LABEL[slotKindOf(d.date)]:''}</span>
       <button class="btn btn-outline btn-sm" onclick="delDay(${i})" style="color:var(--red)">삭제</button>
     </div>`).join('');
 
   // 시간대
-  ['weekday','weekend'].forEach(kind=>{
-    const el = $('cfgSlots'+(kind==='weekday'?'Weekday':'Weekend'));
+  ['weekday','sat','sun'].forEach(kind=>{
+    const el = $('cfgSlots'+kind);
+    if(!el) return;
     el.innerHTML = (config.slots[kind]||[]).map((s,i)=>`
       <div style="display:flex;gap:5px;align-items:center;margin-bottom:6px">
         <input type="time" value="${escA(s.from)}" onchange="setSlot('${kind}',${i},'from',this.value)" style="flex:1;padding:8px">
@@ -1452,7 +1494,7 @@ function delSlot(kind,i){
   saveLocal(); pushConfig(); renderSettings();
 }
 function addSlot(kind){
-  const pre = kind==='weekday'?'w':'e';
+  const pre = { weekday:'w', sat:'s', sun:'u' }[kind] || 'x';
   const id = pre + Date.now().toString(36).slice(-4);
   config.slots[kind].push({ id, from:'09:00', to:'11:00', cap:10 });
   config.updatedAt=Date.now(); saveLocal(); pushConfig(); renderSettings();
@@ -1678,6 +1720,11 @@ function subscribeCloud(){
     const d = snap.data();
     if((d.updatedAt||0) > (config.updatedAt||0)){
       config = Object.assign(defaultConfig(), d);
+      if(config.slots && config.slots.weekend){   // 옛 형식이면 변환 후 다시 올림
+        migrateSlots(config, units);
+        pushConfig();
+        units.forEach(u=>pushUnit(u));
+      }
       saveLocal(); renderAll();
     }
     lastSyncAt = Date.now();

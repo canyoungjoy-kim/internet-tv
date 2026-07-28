@@ -234,7 +234,20 @@ function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,
 function dowOf(d){ const x=new Date(d+'T00:00:00'); return isNaN(x)?'':DOW[x.getDay()]; }
 function isWeekend(d){ const x=new Date(d+'T00:00:00'); return !isNaN(x) && (x.getDay()===0||x.getDay()===6); }
 function fmtDate(d){ const p=d.split('-'); return `${Number(p[1])}월 ${Number(p[2])}일(${dowOf(d)})`; }
-function slotsFor(d){ if(!pub||!pub.slots) return []; return (isWeekend(d)?pub.slots.weekend:pub.slots.weekday)||[]; }
+function slotKindOf(d){
+  const x = new Date(d+'T00:00:00');
+  if(isNaN(x)) return 'weekday';
+  const g = x.getDay();
+  return g===6 ? 'sat' : (g===0 ? 'sun' : 'weekday');
+}
+function slotsFor(d){
+  if(!pub || !pub.slots) return [];
+  const s = pub.slots;
+  const kind = slotKindOf(d);
+  // 예전 형식(평일/주말)로 올라온 자료도 그대로 읽히도록
+  if(kind !== 'weekday' && !s[kind] && s.weekend) return s.weekend;
+  return s[kind] || [];
+}
 function fmtTime(t){
   const [h,m] = t.split(':').map(Number);
   const ap = h<12 ? '오전' : '오후';
