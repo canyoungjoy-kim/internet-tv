@@ -272,6 +272,27 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
           <button class="btn btn-primary btn-full" onclick="bulkAssign()">해당 층 일괄 배정</button>
         </div>
       </div>
+
+      <div class="sec admin-only">
+        <div class="sec-title">기사 일괄 배정</div>
+        <div class="sec-body">
+          <div class="info">아래 조건에 해당하는 <strong>예약된 세대</strong>의 담당 기사를 한 번에 지정합니다.</div>
+          <div class="form-row3">
+            <div class="fg"><label>작업일</label><select id="taDate" onchange="renderTaPreview()"></select></div>
+            <div class="fg"><label>시간대</label><select id="taSlot" onchange="renderTaPreview()"></select></div>
+            <div class="fg"><label>층</label><select id="taFloor" onchange="renderTaPreview()"></select></div>
+          </div>
+          <div id="taPreview"></div>
+          <div class="fg"><label>담당 기사</label><select id="taTech"></select></div>
+          <button class="btn btn-primary btn-full" onclick="assignTech(false)">선택한 기사에게 모두 배정</button>
+          <button class="btn btn-outline btn-full" onclick="assignTech(true)">등록된 기사에게 균등 분배</button>
+          <div class="help">
+            <strong>균등 분배</strong>는 등록된 기사 전원에게 호실 순서대로 고르게 나눕니다.
+            예를 들어 기사 3명에 30세대면 각 10세대씩, 층이 섞이지 않도록 앞에서부터 차례로 배정합니다.<br>
+            이미 배정된 기사도 <strong>덮어씁니다.</strong> 특정 세대만 따로 바꾸려면 세대 상세에서 수정하세요.
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ══════════ 기사·작업지시 ══════════ -->
@@ -1223,6 +1244,76 @@ function renderSched(){
   // 일괄 배정 셀렉트
   $('bkFloor').innerHTML = floorsList().map(f=>`<option value="${f}">${f}층</option>`).join('') || '<option value="">세대 없음</option>';
   $('bkDate').innerHTML = days.map(d=>`<option value="${d.date}">${fmtDate(d.date)}</option>`).join('') || '<option value="">작업일 없음</option>';
+
+  // 기사 일괄 배정 칸
+  const keep = { d:$('taDate').value, s:$('taSlot').value, f:$('taFloor').value, t:$('taTech').value };
+  $('taDate').innerHTML = days.map(d=>`<option value="${d.date}">${fmtDate(d.date)}</option>`).join('') || '<option value="">작업일 없음</option>';
+  if(keep.d && days.some(d=>d.date===keep.d)) $('taDate').value = keep.d;
+  $('taFloor').innerHTML = '<option value="">전체 층</option>' +
+    floorsList().map(f=>`<option value="${f}">${f}층</option>`).join('');
+  if(keep.f) $('taFloor').value = keep.f;
+  $('taTech').innerHTML = (config.techs||[]).length
+    ? '<option value="">— 배정 해제 —</option>' + config.techs.map(t=>`<option value="${escA(t.name)}">${esc(t.name)}</option>`).join('')
+    : '<option value="">기사를 먼저 등록하세요</option>';
+  if(keep.t) $('taTech').value = keep.t;
+  renderTaSlotOptions(keep.s);
+  renderTaPreview();
+}
+function renderTaSlotOptions(keep){
+  const date = $('taDate').value;
+  $('taSlot').innerHTML = '<option value="">전체 시간대</option>' +
+    slotsForDate(date).map(s=>`<option value="${s.id}">${s.from}~${s.to}</option>`).join('');
+  if(keep) $('taSlot').value = keep;
+}
+// 조건에 맞는 예약 세대 목록
+function taTargets(){
+  const date = $('taDate').value;
+  const slot = $('taSlot').value;
+  const floor = $('taFloor').value;
+  if(!date) return [];
+  return units.filter(u=>
+    u.date===date && u.slot &&
+    (!slot || u.slot===slot) &&
+    (!floor || String(u.floor)===String(floor)) &&
+    u.status!=='vacant'
+  ).sort((a,b)=> a.floor-b.floor || String(a.ho).localeCompare(String(b.ho)));
+}
+function renderTaPreview(){
+  renderTaSlotOptions($('taSlot').value);
+  const list = taTargets();
+  const byTech = {};
+  list.forEach(u=>{ const k=u.tech||'(미배정)'; byTech[k]=(byTech[k]||0)+1; });
+  $('taPreview').innerHTML = list.length
+    ? `<div class="info" style="background:var(--primary-light);border-color:#5eead4;color:var(--primary-dark)">
+         대상 <strong>${list.length}세대</strong> · ${esc(list[0].ho)}호 ~ ${esc(list[list.length-1].ho)}호<br>
+         현재 배정: ${Object.entries(byTech).map(([k,v])=>`${esc(k)} ${v}`).join(' · ')}
+       </div>`
+    : `<div class="warn">조건에 맞는 예약 세대가 없습니다. 먼저 날짜·시간대를 배정하세요.</div>`;
+}
+function assignTech(even){
+  const list = taTargets();
+  if(!list.length) return toast('대상 세대가 없습니다');
+  const techs = (config.techs||[]).map(t=>t.name);
+
+  if(even){
+    if(!techs.length) return toast('먼저 작업지시 탭에서 기사를 등록하세요', 3500);
+    if(!confirm(`${list.length}세대를 기사 ${techs.length}명에게 균등 분배합니다.\n이미 배정된 기사도 바뀝니다. 계속할까요?`)) return;
+    const per = Math.ceil(list.length / techs.length);
+    list.forEach((u,i)=>{
+      u.tech = techs[Math.min(techs.length-1, Math.floor(i/per))];
+      u.updatedAt = Date.now(); pushUnit(u);
+    });
+    saveLocal(); renderAll();
+    const cnt = {}; list.forEach(u=>cnt[u.tech]=(cnt[u.tech]||0)+1);
+    toast(Object.entries(cnt).map(([k,v])=>`${k} ${v}세대`).join(' · '), 4500);
+  } else {
+    const name = $('taTech').value;
+    const label = name || '미배정';
+    if(!confirm(`${list.length}세대를 "${label}" 으로 배정합니다. 계속할까요?`)) return;
+    list.forEach(u=>{ u.tech = name; u.updatedAt = Date.now(); pushUnit(u); });
+    saveLocal(); renderAll();
+    toast(`${list.length}세대를 ${label} 으로 배정했습니다`, 3500);
+  }
 }
 
 function showSlotUnits(date, slot){
