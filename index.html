@@ -252,7 +252,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
     <!-- ══════════ 일정 ══════════ -->
     <div class="view" id="v-sched">
       <div id="sBody"></div>
-      <div class="sec">
+      <div class="sec admin-only">
         <div class="sec-title">층 단위 일괄 배정</div>
         <div class="sec-body">
           <div class="info">아직 예약이 없는 세대만 채웁니다. 이미 예약·완료된 세대는 건드리지 않습니다.</div>
@@ -287,7 +287,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
         </div>
       </div>
       <div id="wsBody"></div>
-      <div class="sec no-print">
+      <div class="sec no-print admin-only">
         <div class="sec-title">설치기사 명단 <button class="btn btn-outline btn-sm" onclick="addTech()">+ 추가</button></div>
         <div id="techList"></div>
       </div>
@@ -311,7 +311,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
         <div class="sec-title">장비 회수·설치 집계</div>
         <div style="padding:2px 0"><table class="tbl" id="stEquip"></table></div>
       </div>
-      <div class="sec no-print">
+      <div class="sec no-print admin-only">
         <div class="sec-title">자료 내보내기 / 가져오기</div>
         <div class="sec-body">
           <button class="btn btn-outline btn-full" onclick="exportCsv()">⬇ 전체 세대 CSV 내려받기</button>
@@ -364,7 +364,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
         </div>
       </div>
 
-      <div class="sec">
+      <div class="sec admin-only">
         <div class="sec-title">입주민 예약 페이지</div>
         <div class="sec-body">
           <div class="info">입주민이 이 주소로 들어가 <strong>호실 + 연락처 뒷 4자리</strong>로 본인 확인 후 직접 시간을 고릅니다. 예약 즉시 이 앱에 반영됩니다.</div>
@@ -388,7 +388,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
         </div>
       </div>
 
-      <div class="sec">
+      <div class="sec admin-only">
         <div class="sec-title">작업일 설정</div>
         <div class="sec-body">
           <div id="cfgDays"></div>
@@ -396,7 +396,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
         </div>
       </div>
 
-      <div class="sec">
+      <div class="sec admin-only">
         <div class="sec-title">시간대 설정</div>
         <div class="sec-body">
           <div class="fg"><label style="font-size:14.9px;color:var(--text)">평일 시간대 (월~금)</label><div id="cfgSlotsweekday"></div>
@@ -410,7 +410,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
         </div>
       </div>
 
-      <div class="sec">
+      <div class="sec admin-only">
         <div class="sec-title">세대 생성</div>
         <div class="sec-body">
           <div class="warn">최초 1회만 실행하세요. 이미 있는 호실은 건드리지 않고, 없는 호실만 새로 만듭니다.</div>
@@ -428,7 +428,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
             <div class="cs-l2" id="verInfo"></div>
           </div>
           <button class="btn btn-outline btn-full btn-sm" onclick="location.reload(true)">앱 새로고침</button>
-          <button class="btn btn-danger btn-full btn-sm" onclick="wipeAll()">전체 데이터 삭제</button>
+          <button class="btn btn-danger btn-full btn-sm admin-only" onclick="wipeAll()">전체 데이터 삭제</button>
         </div>
       </div>
     </div>
@@ -467,8 +467,32 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 const APP_VERSION = 'v1.0 (2026-07-27)';
 const SITE_ID = 'unseo-thetime';
 const LS_UNITS = 'ittv_units';
+const LS_CONTACTS = 'ittv_contacts';
 const LS_CONFIG = 'ittv_config';
 const LS_FB = 'ittv_fbconfig';
+
+/* ── 권한 ──────────────────────────────────────────
+   관리자 : 소장님 Google 계정. 전부 가능
+   직원   : 공용 계정. 전체 열람 + 작업 입력. 예약·설정·명단은 불가
+   설치기사: 공용 계정. 작업 입력만. 입주민 이름·연락처는 아예 내려받지 못함
+   ※ 이름·연락처는 units 와 분리된 contacts 에 저장하고,
+      기사 계정은 규칙에서 contacts 읽기 자체를 막습니다(화면 가림이 아님). */
+const ACCOUNTS = {
+  admin: 'canyoungjoy@gmail.com',
+  staff: 'staff@thetime.kr',
+  tech:  'tech@thetime.kr',
+};
+const ROLE_LABEL = { admin:'관리자', staff:'직원', tech:'설치기사' };
+let myRole = 'admin';
+
+function roleOfEmail(email){
+  const e = String(email||'').toLowerCase();
+  if(e === ACCOUNTS.admin.toLowerCase()) return 'admin';
+  if(e === ACCOUNTS.staff.toLowerCase()) return 'staff';
+  return 'tech';                       // 모르는 계정은 가장 낮은 권한으로
+}
+function isAdmin(){ return myRole === 'admin'; }
+function canSeePersonal(){ return myRole !== 'tech'; }   // 이름·연락처 열람
 
 const STATUS = {
   todo:      { label:'미접촉', cls:'st-todo',      color:'#94a3b8' },
@@ -502,7 +526,8 @@ const EQUIP_INS = [
   { key:'stb',    label:'셋톱박스' },
 ];
 
-let units = [];        // 세대 배열
+let units = [];        // 세대 배열 (개인정보 없음)
+let contacts = {};     // 호실 → { name, phone, phone4 }  — 관리자·직원만 내려받음
 let config = null;     // 설정
 let unitView = 'grid'; // grid | list
 let curFloor = 'all';
@@ -514,7 +539,7 @@ let toastTimer = null;
 let fbConfig = null;
 let firebaseApp=null, firebaseAuth=null, firebaseDB=null;
 let cloudUser = null;
-let unsubUnits=null, unsubConfig=null, unsubBookings=null;
+let unsubUnits=null, unsubConfig=null, unsubBookings=null, unsubContacts=null;
 let cloudApplying = false;
 let lastSyncAt = null;
 
@@ -552,6 +577,24 @@ function fmtDate(dateStr){
 }
 function normPhone(s){
   return String(s||'').replace(/[^0-9]/g,'');
+}
+/* 연락처 조회 — 기사 계정에는 애초에 자료가 없어 빈 값이 됩니다 */
+function ctOf(u){ return canSeePersonal() ? (contacts[u.ho] || {}) : {}; }
+function nameOf(u){ return ctOf(u).name || ''; }
+function phoneOf(u){ return ctOf(u).phone || ''; }
+// 기사 계정으로 바뀌면 기기에 남은 개인정보 캐시까지 지웁니다
+function purgeContactsIfTech(){
+  if(myRole !== 'tech') return;
+  contacts = {};
+  try{ localStorage.removeItem(LS_CONTACTS); }catch(e){}
+}
+function setContact(ho, name, phone){
+  const c = contacts[ho] || {};
+  if(name  !== undefined) c.name  = name;
+  if(phone !== undefined){ c.phone = phone; c.phone4 = last4(phone); }
+  c.ho = ho; c.updatedAt = Date.now();
+  contacts[ho] = c;
+  return c;
 }
 function last4(s){
   const n = normPhone(s);
@@ -669,13 +712,34 @@ function loadLocal(){
     const f = localStorage.getItem(LS_FB);
     fbConfig = f ? JSON.parse(f) : null;
   }catch(e){ fbConfig=null; }
+  try{
+    const ct = localStorage.getItem(LS_CONTACTS);
+    contacts = ct ? JSON.parse(ct) : {};
+  }catch(e){ contacts = {}; }
   units.forEach(normalizeUnit);
   migrateSlots(config, units);
+}
+/* 예전 구조(세대 안에 이름·연락처가 같이 있던 형태)를 분리형으로 옮김.
+   반환값이 true면 그 세대는 클라우드에도 다시 올려야 합니다. */
+function splitPersonal(u){
+  let moved = false;
+  if(u.name || u.phone){
+    const c = contacts[u.ho] || {};
+    if(u.name  && !c.name ) c.name  = u.name;
+    if(u.phone && !c.phone){ c.phone = u.phone; c.phone4 = u.phone4 || last4(u.phone); }
+    c.ho = u.ho; c.updatedAt = c.updatedAt || Date.now();
+    contacts[u.ho] = c;
+    moved = true;
+  }
+  delete u.name; delete u.phone; delete u.phone4;
+  return moved;
 }
 function saveLocal(){
   try{
     localStorage.setItem(LS_UNITS, JSON.stringify(units));
     localStorage.setItem(LS_CONFIG, JSON.stringify(config));
+    if(canSeePersonal()) localStorage.setItem(LS_CONTACTS, JSON.stringify(contacts));
+    else localStorage.removeItem(LS_CONTACTS);
   }catch(e){ toast('⚠️ 저장 공간이 부족합니다'); }
 }
 function normalizeUnit(u){
@@ -687,6 +751,7 @@ function normalizeUnit(u){
   if(u.presence===undefined) u.presence = '';
   if(!u.sn) u.sn = { router:'', stb:'' };
   if(typeof u.updatedAt!=='number') u.updatedAt = 0;
+  splitPersonal(u);
   return u;
 }
 
@@ -699,6 +764,7 @@ function switchView(v){
   if(el) el.classList.add('active');
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active', b.dataset.v===v));
   $('mainContent').scrollTop = 0;
+  applyRoleUI();
   if(v==='dash') renderDash();
   if(v==='units') renderUnits();
   if(v==='sched') renderSched();
@@ -707,7 +773,16 @@ function switchView(v){
   if(v==='settings') renderSettings();
 }
 
+function applyRoleUI(){
+  document.querySelectorAll('.admin-only').forEach(el=>{
+    el.style.display = isAdmin() ? '' : 'none';
+  });
+  const t = $('hdrTitle');
+  if(t) t.textContent = isAdmin() ? '인터넷·TV 장비교체'
+                                  : `인터넷·TV 장비교체 · ${ROLE_LABEL[myRole]}`;
+}
 function renderAll(){
+  applyRoleUI();
   const active = document.querySelector('.view.active');
   const v = active ? active.id.replace('v-','') : 'dash';
   if(v==='dash') renderDash();
@@ -776,7 +851,7 @@ function renderDash(){
         <div class="ulist-item" onclick="openUnit('${u.id}')">
           <div class="ul-ho">${esc(u.ho)}</div>
           <div class="ul-mid">
-            <div class="ul-name">${esc(u.name||'(이름 없음)')}</div>
+            <div class="ul-name">${esc(nameOf(u) || (canSeePersonal()?'(이름 없음)':u.ho+'호'))}</div>
             <div class="ul-meta" style="color:var(--orange);font-weight:700">${esc(msg)}</div>
           </div>
           <span class="badge ${STATUS[u.status].cls}">${STATUS[u.status].label}</span>
@@ -836,7 +911,7 @@ function unitRowHtml(u, showSlot){
   return `<div class="ulist-item" onclick="openUnit('${u.id}')">
     <div class="ul-ho">${esc(u.ho)}</div>
     <div class="ul-mid">
-      <div class="ul-name">${esc(u.name||'(이름 없음)')}</div>
+      <div class="ul-name">${esc(nameOf(u) || (canSeePersonal()?'(이름 없음)':u.ho+'호'))}</div>
       <div class="ul-meta">${esc(bits.filter(Boolean).join(' · ')||'—')}</div>
     </div>
     <span class="badge ${st.cls}">${st.label}</span>
@@ -874,7 +949,7 @@ function renderUnits(){
     if(curFloor!=='all' && u.floor!==curFloor) return false;
     if(curStatus!=='all' && u.status!==curStatus) return false;
     if(q){
-      const hay = `${u.ho} ${u.name||''} ${u.phone||''} ${u.tech||''}`.toLowerCase();
+      const hay = `${u.ho} ${nameOf(u)} ${phoneOf(u)} ${u.tech||''}`.toLowerCase();
       if(!hay.includes(q)) return false;
     }
     return true;
@@ -931,7 +1006,7 @@ function openUnit(id){
   // 목록 보기 모드에서 바뀐 하단 버튼을 원래대로 복구
   $('unitModal').querySelector('.modal-foot').innerHTML =
     `<button class="btn btn-outline" onclick="closeUnitModal()" style="flex:1">닫기</button>
-     <button class="btn btn-primary" onclick="saveUnitModal()" style="flex:2">저장</button>`;
+     <button class="btn btn-primary" onclick="saveUnitModal()" style="flex:2">${isAdmin()?'저장':'작업내용 저장'}</button>`;
 
   const dayOpts = ['<option value="">— 미정 —</option>']
     .concat(config.days.filter(d=>d.date).map(d=>`<option value="${d.date}" ${u.date===d.date?'selected':''}>${fmtDate(d.date)}</option>`)).join('');
@@ -939,27 +1014,30 @@ function openUnit(id){
     .concat((config.techs||[]).map(t=>`<option value="${escA(t.name)}" ${u.tech===t.name?'selected':''}>${esc(t.name)}</option>`)).join('');
 
   $('umBody').innerHTML = `
+    ${canSeePersonal() ? `
     <div class="sec">
       <div class="sec-title">입주민</div>
       <div class="sec-body">
         <div class="form-row">
-          <div class="fg"><label>이름</label><input id="umName" value="${escA(u.name||'')}"></div>
-          <div class="fg"><label>연락처</label><input id="umPhone" type="tel" inputmode="numeric" value="${escA(u.phone||'')}"></div>
+          <div class="fg"><label>이름</label>
+            <input id="umName" value="${escA(nameOf(u))}" ${isAdmin()?'':'disabled'}></div>
+          <div class="fg"><label>연락처</label>
+            <input id="umPhone" type="tel" inputmode="numeric" value="${escA(phoneOf(u))}" ${isAdmin()?'':'disabled'}></div>
         </div>
-        ${u.phone ? `<a class="btn btn-outline btn-full btn-sm" href="tel:${escA(normPhone(u.phone))}">📞 ${esc(u.phone)} 전화걸기</a>` : ''}
+        ${phoneOf(u) ? `<a class="btn btn-outline btn-full btn-sm" href="tel:${escA(normPhone(phoneOf(u)))}">📞 ${esc(phoneOf(u))} 전화걸기</a>` : ''}
       </div>
-    </div>
+    </div>` : ''}
 
     <div class="sec">
-      <div class="sec-title">재실 유형</div>
-      <div class="sec-body">
+      <div class="sec-title">재실 유형 ${isAdmin()?'':'<span style="font-weight:700">🔒 보기 전용</span>'}</div>
+      <div class="sec-body" ${isAdmin()?'':'style="pointer-events:none;opacity:.72"'}>
         <div class="seg" style="grid-template-columns:repeat(2,1fr)" id="umPresence">
           ${Object.entries(PRESENCE).filter(([k])=>k!=='').map(([k,v])=>
             `<button type="button" class="seg-btn ${u.presence===k?'on':''}" data-v="${k}" onclick="pickSeg(this,'umPresence')">${v}</button>`).join('')}
         </div>
         <div id="umPinWrap" style="display:${u.presence==='pin'?'block':'none'}">
           <div class="fg">
-            <label>현관 비밀번호</label>
+            <label>현관 비밀번호 ${isAdmin()?'':'(작업용 · 수정 불가)'}</label>
             <div class="pin-mask">
               <input id="umPin" type="password" value="${escA(u.pin||'')}" placeholder="작업 완료 시 자동 삭제">
               <button class="btn btn-outline btn-sm" type="button" onclick="togglePin()">보기</button>
@@ -970,9 +1048,20 @@ function openUnit(id){
       </div>
     </div>
 
+    ${(!isAdmin() && u.presence==='pin') ? `
     <div class="sec">
-      <div class="sec-title">예약</div>
+      <div class="sec-title">현관 비밀번호</div>
       <div class="sec-body">
+        <div style="font-size:31px;font-weight:800;letter-spacing:4px;text-align:center;padding:8px 0">
+          ${esc(u.pin || '(미입력)')}
+        </div>
+        <div class="warn">작업이 끝나면 <strong>진행 상태를 작업완료로</strong> 바꿔주세요. 저장된 비밀번호가 자동으로 지워집니다.</div>
+      </div>
+    </div>` : ''}
+
+    <div class="sec">
+      <div class="sec-title">예약 ${isAdmin()?'':'<span style="font-weight:700">🔒 보기 전용</span>'}</div>
+      <div class="sec-body" ${isAdmin()?'':'style="pointer-events:none;opacity:.72"'}>
         <div class="form-row">
           <div class="fg"><label>작업일</label><select id="umDate" onchange="onUmDateChange()">${dayOpts}</select></div>
           <div class="fg"><label>시간대</label><select id="umSlot"></select></div>
@@ -1061,14 +1150,16 @@ function closeUnitModal(){ $('unitModal').classList.remove('open'); editingUnitI
 function saveUnitModal(){
   const u = units.find(x=>x.id===editingUnitId);
   if(!u) return closeUnitModal();
-  u.name  = $('umName').value.trim();
-  u.phone = $('umPhone').value.trim();
-  u.phone4 = last4(u.phone);
-  u.presence = segValue('umPresence');
-  u.pin = u.presence==='pin' ? ($('umPin')?$('umPin').value.trim():'') : '';
-  u.date = $('umDate').value;
-  u.slot = $('umSlot').value;
-  u.tech = $('umTech').value;
+  // 관리자만 고칠 수 있는 항목 (직원·기사 화면에서는 잠겨 있음)
+  if(isAdmin()){
+    setContact(u.ho, $('umName').value.trim(), $('umPhone').value.trim());
+    pushContact(u.ho);
+    u.presence = segValue('umPresence');
+    u.pin = u.presence==='pin' ? ($('umPin')?$('umPin').value.trim():'') : '';
+    u.date = $('umDate').value;
+    u.slot = $('umSlot').value;
+    u.tech = $('umTech').value;
+  }
   u.sn = { router: $('umSnRouter').value.trim(), stb: $('umSnStb').value.trim() };
   EQUIP_RET.forEach(e=>{
     const el = document.querySelector(`[data-k="ret_${e.key}"]`);
@@ -1269,8 +1360,7 @@ function renderWorksheet(){
     return `<tr>
       <td style="font-weight:800;font-size:17.2px">${esc(u.ho)}</td>
       <td>${esc(slotLabel(date,u.slot)||'미정')}</td>
-      <td>${esc(u.name||'')}</td>
-      <td>${esc(u.phone||'')}</td>
+      ${canSeePersonal() ? `<td>${esc(nameOf(u))}</td><td>${esc(phoneOf(u))}</td>` : ''}
       <td>${pinCell}</td>
       <td>${esc(u.tech||'')}</td>
       <td style="letter-spacing:3px;white-space:nowrap">☐☐☐☐</td>
@@ -1285,7 +1375,7 @@ function renderWorksheet(){
       <div style="overflow-x:auto">
         <table class="tbl">
           <thead><tr>
-            <th>호실</th><th>시간</th><th>성명</th><th>연락처</th><th>비번/재실</th><th>기사</th>
+            <th>호실</th><th>시간</th>${canSeePersonal()?'<th>성명</th><th>연락처</th>':''}<th>비번/재실</th><th>기사</th>
             <th>회수<br><span style="font-weight:600">공유기·셋톱·리모컨·전원</span></th>
             <th>설치<br><span style="font-weight:600">공유기·셋톱</span></th>
             <th>확인</th>
@@ -1365,7 +1455,7 @@ function exportCsv(){
                  '공유기회수','셋톱회수','리모컨회수','전원코드회수','공유기설치','셋톱설치',
                  '공유기S/N','셋톱S/N','메모']];
   units.slice().sort((a,b)=>a.floor-b.floor||String(a.ho).localeCompare(String(b.ho))).forEach(u=>{
-    rows.push([u.ho,u.floor,u.name||'',u.phone||'',PRESENCE[u.presence]||'',
+    rows.push([u.ho,u.floor,nameOf(u),phoneOf(u),PRESENCE[u.presence]||'',
       u.date||'', slotLabel(u.date,u.slot), u.tech||'', STATUS[u.status].label,
       u.ret.router?'O':'', u.ret.stb?'O':'', u.ret.remote?'O':'', u.ret.power?'O':'',
       u.ins.router?'O':'', u.ins.stb?'O':'',
@@ -1378,7 +1468,7 @@ function exportEquipCsv(){
                  '공유기설치','셋톱설치','공유기S/N','셋톱S/N','미회수사유']];
   units.filter(u=>u.status==='done'||EQUIP_RET.some(e=>u.ret[e.key])).forEach(u=>{
     const miss = EQUIP_RET.filter(e=>!u.ret[e.key]).map(e=>e.label).join('·');
-    rows.push([u.ho,u.name||'',u.date||'',u.tech||'',
+    rows.push([u.ho,nameOf(u),u.date||'',u.tech||'',
       u.ret.router?'O':'X', u.ret.stb?'O':'X', u.ret.remote?'O':'X', u.ret.power?'O':'X',
       u.ins.router?'O':'X', u.ins.stb?'O':'X',
       u.sn.router||'', u.sn.stb||'', miss?`미회수(${miss}) ${u.note||''}`:'']);
@@ -1428,14 +1518,16 @@ function importCsv(ev){
         const note = iNote>=0 ? String(rows[r][iNote]||'').trim() : '';
         let u = units.find(x=>String(x.ho)===ho);
         if(u){
-          if(name) u.name=name;
-          if(phone){ u.phone=phone; u.phone4=last4(phone); }
+          if(name) setContact(u.ho, name, undefined);
+          if(phone) setContact(u.ho, undefined, phone);
+          if(name||phone) pushContact(u.ho);
           if(note) u.note = u.note ? u.note+' / '+note : note;
           u.updatedAt=Date.now(); pushUnit(u); updated++;
         } else {
           const floor = Number(String(ho).slice(0, String(ho).length-2)) || 0;
           if(!floor){ skipped++; continue; }
-          u = normalizeUnit({ id:ho, ho, floor, name, phone, phone4:last4(phone), note, status:'todo', presence:'', date:'', slot:'', tech:'', pin:'', updatedAt:Date.now() });
+          u = normalizeUnit({ id:ho, ho, floor, note, status:'todo', presence:'', date:'', slot:'', tech:'', pin:'', updatedAt:Date.now() });
+          if(name||phone){ setContact(ho, name, phone); pushContact(ho); }
           units.push(u); pushUnit(u); created++;
         }
       }
@@ -1605,21 +1697,47 @@ service cloud.firestore {
   match /databases/{db}/documents {
 
     // 관리자 = 구글 로그인 사용자, 입주민 = 익명 로그인 사용자
+    // 관리자 = 소장님 Google 계정 (아래 주소를 바꾸면 관리자가 바뀝니다)
     function isAdmin() {
       return request.auth != null
+          && request.auth.token.email == 'canyoungjoy@gmail.com'
           && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // 직원·기사 공용 계정
+    function isStaff() { return request.auth != null && request.auth.token.email == 'staff@thetime.kr'; }
+    function isTech()  { return request.auth != null && request.auth.token.email == 'tech@thetime.kr'; }
+    function isWorker(){ return isStaff() || isTech(); }
+
+    // 작업자가 고칠 수 있는 항목만 나열 — 이 외의 필드를 건드리면 서버가 거부
+    function changed() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+    function onlyWorkFields() {
+      return changed().hasOnly(['ret','ins','sn','status','note','updatedAt','pin'])
+             // 비밀번호는 '지우는 것'만 허용 (작업완료 시 자동 삭제)
+             && (!changed().hasAny(['pin']) || request.resource.data.pin == '');
     }
 
     match /sites/{site} {
 
-      // 세대 원본(이름·연락처·비번) — 관리자만
+      // 작업 자료 — 이름·연락처는 여기에 없습니다
       match /units/{unitId} {
-        allow read, write: if isAdmin();
+        allow read:   if isAdmin() || isWorker();
+        allow create, delete: if isAdmin();
+        allow update: if isAdmin() || (isWorker() && onlyWorkFields());
       }
 
-      // 관리자 전용 설정(기사 연락처 포함)
+      // 입주민 이름·연락처 — 관리자와 직원만. 기사는 읽기 자체가 불가
+      match /contacts/{unitId} {
+        allow read:  if isAdmin() || isStaff();
+        allow write: if isAdmin();
+      }
+
+      // 작업일·시간대·기사 명단 — 작업자는 보기만
       match /meta/config {
-        allow read, write: if isAdmin();
+        allow read:  if isAdmin() || isWorker();
+        allow write: if isAdmin();
       }
       // 예약 페이지가 읽는 공개 정보 — 개인정보 없음(작업일·시간대·정원)
       match /meta/public {
@@ -1673,7 +1791,10 @@ async function initFirebase(){
 
     authMod.onAuthStateChanged(firebaseAuth, user=>{
       cloudUser = (user && !user.isAnonymous) ? user : null;
+      myRole = cloudUser ? roleOfEmail(cloudUser.email) : 'admin';
+      purgeContactsIfTech();                 // 기사 기기에는 개인정보를 남기지 않음
       renderCloudStatus();
+      renderAll();
       if(cloudUser) subscribeCloud();
       else unsubscribeCloud();
     });
@@ -1683,15 +1804,43 @@ async function initFirebase(){
     toast('Firebase 초기화 실패: '+e.message, 4000);
   }
 }
+/* 붙여넣은 글 안에서 apiKey 가 들어 있는 { } 덩어리만 정확히 잘라냅니다.
+   import { initializeApp } 같은 다른 중괄호가 섞여 있어도 헷갈리지 않습니다. */
+function extractConfigObject(raw){
+  const key = raw.indexOf('apiKey');
+  if(key < 0) throw new Error('apiKey 를 찾지 못했습니다. Firebase 설정을 통째로 붙여넣어 주세요');
+  let start = raw.lastIndexOf('{', key);
+  if(start < 0) throw new Error('설정을 감싼 중괄호 { 를 찾지 못했습니다');
+  let depth = 0;
+  for(let i = start; i < raw.length; i++){
+    if(raw[i] === '{') depth++;
+    else if(raw[i] === '}'){
+      depth--;
+      if(depth === 0) return raw.slice(start, i+1);
+    }
+  }
+  throw new Error('설정을 닫는 중괄호 } 를 찾지 못했습니다');
+}
 function saveFbConfig(){
   const raw = $('fbConfigInput').value.trim();
   if(!raw) return toast('설정을 붙여넣으세요');
   try{
-    // { apiKey: "..." } 형태(따옴표 없는 키)도 허용
-    let json = raw.replace(/^\s*const\s+\w+\s*=\s*/,'').replace(/;\s*$/,'');
+    /* 어떤 형태로 붙여넣어도 받아들입니다.
+       - { "apiKey": ... }                        (설정 객체만)
+       - const firebaseConfig = { ... };          (Firebase 콘솔 그대로)
+       - window.ITTV_FIREBASE_CONFIG = { ... };   (fbconfig.js 내용 그대로)
+       - 앞뒤 주석(/* *​/, //)이 섞여 있어도 무방 */
+    const json = extractConfigObject(raw);
     let cfg;
     try{ cfg = JSON.parse(json); }
-    catch(e){ cfg = JSON.parse(json.replace(/([{,]\s*)([A-Za-z0-9_]+)\s*:/g,'$1"$2":').replace(/'/g,'"')); }
+    catch(e){
+      // 따옴표 없는 키, 홑따옴표, 마지막 쉼표까지 허용
+      const relaxed = json
+        .replace(/([{,]\s*)([A-Za-z0-9_$]+)\s*:/g, '$1"$2":')
+        .replace(/'/g, '"')
+        .replace(/,(\s*[}\]])/g, '$1');
+      cfg = JSON.parse(relaxed);
+    }
     if(!cfg.apiKey || !cfg.projectId) throw new Error('apiKey / projectId 가 없습니다');
     fbConfig = cfg;
     localStorage.setItem(LS_FB, JSON.stringify(cfg));
@@ -1709,12 +1858,26 @@ function renderCloudStatus(){
   }
   $('syncBtn').style.display='';
   if(cloudUser){
-    box.innerHTML = `<div class="cs-l1">🟢 동기화 중</div>
-      <div class="cs-l2">${esc(cloudUser.email||'')}<br>마지막 동기화: ${lastSyncAt?new Date(lastSyncAt).toLocaleString('ko-KR'):'—'}</div>`;
+    const badge = { admin:'🟢', staff:'🔵', tech:'🟠' }[myRole];
+    box.innerHTML = `<div class="cs-l1">${badge} 동기화 중 · ${ROLE_LABEL[myRole]}</div>
+      <div class="cs-l2">${esc(cloudUser.email||'')}<br>마지막 동기화: ${lastSyncAt?new Date(lastSyncAt).toLocaleString('ko-KR'):'—'}
+      ${myRole==='tech' ? '<br>입주민 이름·연락처는 이 계정에 제공되지 않습니다.' : ''}
+      ${myRole==='staff' ? '<br>예약·설정 변경은 관리자만 가능합니다.' : ''}</div>`;
     btns.innerHTML = `<button class="btn btn-outline btn-full btn-sm" onclick="cloudSignOut()">로그아웃</button>`;
   } else {
-    box.innerHTML = `<div class="cs-l1">🟡 로그인 필요</div><div class="cs-l2">Google 계정으로 로그인하세요.</div>`;
-    btns.innerHTML = `<button class="btn btn-primary btn-full btn-sm" onclick="cloudSignIn()">Google 로그인</button>`;
+    box.innerHTML = `<div class="cs-l1">🟡 로그인 필요</div>
+      <div class="cs-l2">관리자는 Google, 직원·기사는 아이디/비밀번호로 로그인하세요.</div>`;
+    btns.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:8px;width:100%">
+        <button class="btn btn-primary btn-full btn-sm" onclick="cloudSignIn()">Google 로그인 (관리자)</button>
+        <div style="border-top:1px dashed var(--border);padding-top:8px">
+          <div class="form-row" style="margin-bottom:6px">
+            <input id="pwEmail" placeholder="아이디" autocomplete="username" style="padding:9px">
+            <input id="pwPass" type="password" placeholder="비밀번호" autocomplete="current-password" style="padding:9px">
+          </div>
+          <button class="btn btn-outline btn-full btn-sm" onclick="pwSignIn()">직원 · 기사 로그인</button>
+        </div>
+      </div>`;
   }
 }
 async function cloudSignIn(){
@@ -1728,14 +1891,34 @@ async function cloudSignIn(){
     } else toast('로그인 실패: '+e.message, 4000);
   }
 }
+// 직원·기사 공용 계정 (아이디/비밀번호)
+async function pwSignIn(){
+  if(!firebaseAuth) return toast('Firebase 설정을 먼저 저장하세요');
+  let email = ($('pwEmail').value||'').trim();
+  const pass = $('pwPass').value||'';
+  if(!email || !pass) return toast('아이디와 비밀번호를 입력하세요');
+  if(!email.includes('@')) email += '@thetime.kr';   // 아이디만 입력해도 되도록
+  try{
+    await window._fb.signInWithEmailAndPassword(firebaseAuth, email, pass);
+  }catch(e){
+    const msg = {
+      'auth/invalid-credential':'아이디 또는 비밀번호가 맞지 않습니다',
+      'auth/wrong-password':'비밀번호가 맞지 않습니다',
+      'auth/user-not-found':'등록되지 않은 아이디입니다',
+      'auth/invalid-email':'아이디 형식이 올바르지 않습니다',
+      'auth/too-many-requests':'시도가 많아 잠시 막혔습니다. 조금 뒤 다시 하세요',
+    }[e.code] || e.message;
+    toast('로그인 실패: '+msg, 4000);
+  }
+}
 async function cloudSignOut(){
   unsubscribeCloud();
   try{ await window._fb.signOut(firebaseAuth); }catch(e){}
   cloudUser=null; renderCloudStatus();
 }
 function unsubscribeCloud(){
-  [unsubUnits, unsubConfig, unsubBookings].forEach(f=>{ if(f) try{f();}catch(e){} });
-  unsubUnits=unsubConfig=unsubBookings=null;
+  [unsubUnits, unsubConfig, unsubBookings, unsubContacts].forEach(f=>{ if(f) try{f();}catch(e){} });
+  unsubUnits=unsubConfig=unsubBookings=unsubContacts=null;
 }
 function subscribeCloud(){
   if(!firebaseDB || !cloudUser) return;
@@ -1744,20 +1927,41 @@ function subscribeCloud(){
 
   unsubUnits = onSnapshot(collection(firebaseDB,'sites',SITE_ID,'units'), snap=>{
     cloudApplying = true;
+    const legacy = [];
     snap.docChanges().forEach(ch=>{
       const d = ch.doc.data();
       if(ch.type==='removed'){
         units = units.filter(u=>u.id!==ch.doc.id);
         return;
       }
+      const hadPersonal = !!(d.name || d.phone);   // 옛 구조로 올라와 있던 문서
       const i = units.findIndex(u=>u.id===ch.doc.id);
       if(i<0) units.push(normalizeUnit(d));
       else if((d.updatedAt||0) >= (units[i].updatedAt||0)) units[i] = normalizeUnit(d);
+      if(hadPersonal) legacy.push(ch.doc.id);
     });
     cloudApplying = false;
     lastSyncAt = Date.now();
     saveLocal(); renderAll();
+    // 관리자가 접속했을 때 개인정보를 contacts 로 옮기고 units 에서 지웁니다
+    if(legacy.length && isAdmin()){
+      legacy.forEach(id=>{
+        const u = units.find(x=>x.id===id);
+        if(u){ pushUnit(u); pushContact(u.ho); }
+      });
+    }
   }, err=>{ console.error(err); toast('동기화 오류: '+err.code, 4000); });
+
+  // 이름·연락처 — 관리자·직원만 구독 (기사 계정은 규칙에서 거부됨)
+  if(canSeePersonal()){
+    unsubContacts = onSnapshot(collection(firebaseDB,'sites',SITE_ID,'contacts'), snap=>{
+      snap.docChanges().forEach(ch=>{
+        if(ch.type==='removed'){ delete contacts[ch.doc.id]; return; }
+        contacts[ch.doc.id] = ch.doc.data();
+      });
+      saveLocal(); renderAll();
+    }, err=>console.error('연락처 동기화', err));
+  }
 
   unsubConfig = onSnapshot(doc(firebaseDB,'sites',SITE_ID,'meta','config'), snap=>{
     if(!snap.exists()){ pushConfig(); return; }
@@ -1795,7 +1999,7 @@ function applyBooking(b){
   u.slot = b.slot||'';
   u.presence = b.presence || u.presence;
   if(b.pin) u.pin = b.pin;
-  if(b.name && !u.name) u.name = b.name;
+  if(b.name && !nameOf(u)){ setContact(u.ho, b.name, undefined); pushContact(u.ho); }
   if(b.note) u.note = (u.note? u.note+' / ':'') + '[입주민] ' + b.note;
   u.bookedBy = 'self';
   u.bookedAtMs = b.at||Date.now();
@@ -1809,9 +2013,23 @@ async function pushUnit(u){
   if(!firebaseDB || !cloudUser || cloudApplying) return;
   try{
     const { doc, setDoc } = window._fb;
-    await setDoc(doc(firebaseDB,'sites',SITE_ID,'units',u.id), JSON.parse(JSON.stringify(u)));
+    const clean = JSON.parse(JSON.stringify(u));
+    delete clean.name; delete clean.phone; delete clean.phone4;   // 개인정보는 여기에 담지 않음
+    await setDoc(doc(firebaseDB,'sites',SITE_ID,'units',u.id), clean);
     schedulePublish();
   }catch(e){ console.error('업로드 실패', u.id, e); }
+}
+// 이름·연락처는 별도 컬렉션 — 기사 계정은 규칙에서 읽기가 막혀 있습니다
+async function pushContact(ho){
+  if(!firebaseDB || !cloudUser || cloudApplying) return;
+  if(!isAdmin()) return;
+  const c = contacts[ho];
+  if(!c) return;
+  try{
+    const { doc, setDoc } = window._fb;
+    await setDoc(doc(firebaseDB,'sites',SITE_ID,'contacts',String(ho)), JSON.parse(JSON.stringify(c)));
+    schedulePublish();
+  }catch(e){ console.error('연락처 업로드 실패', ho, e); }
 }
 async function deleteUnitCloud(id){
   if(!firebaseDB || !cloudUser) return;
@@ -1857,7 +2075,7 @@ function schedulePublish(){
 }
 function rosterSig(){
   return units.filter(u=>u.status!=='vacant')
-              .map(u=>`${u.ho}:${u.phone4||''}`).sort().join('|');
+              .map(u=>`${u.ho}:${ctOf(u).phone4||''}`).sort().join('|');
 }
 async function publishPublic(force){
   if(!firebaseDB || !cloudUser) return;
@@ -1891,8 +2109,9 @@ async function publishPublic(force){
       const hashes = {};
       for(const u of units){
         if(u.status==='vacant') continue;
-        if(u.phone4 && u.phone4.length===4){
-          hashes[u.ho] = await sha256hex(`${SITE_ID}:${u.ho}:${u.phone4}`);
+        const p4 = ctOf(u).phone4;
+        if(p4 && p4.length===4){
+          hashes[u.ho] = await sha256hex(`${SITE_ID}:${u.ho}:${p4}`);
         } else {
           hashes[u.ho] = '';   // 연락처 미등록 세대 → 뒷4자리 확인 없이 진행
         }
