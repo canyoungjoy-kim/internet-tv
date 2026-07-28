@@ -23,68 +23,68 @@
   --purple:#7c3aed;--purple-bg:#ede9fe;
   --radius:12px;
 }
-html,body{height:100%;font-family:'Apple SD Gothic Neo','Noto Sans KR','Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:15px;-webkit-font-smoothing:antialiased}
+html,body{height:100%;font-family:'Apple SD Gothic Neo','Noto Sans KR','Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:17.2px;-webkit-font-smoothing:antialiased}
 #app{display:flex;flex-direction:column;height:100%;height:100dvh}
 header{background:var(--primary);color:#fff;padding:0 12px;display:flex;align-items:center;height:52px;gap:8px;flex-shrink:0}
-header h1{font-size:16px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hdr-btn{background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+header h1{font-size:18.4px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr-btn{background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:8px;padding:6px 10px;font-size:14.9px;cursor:pointer;white-space:nowrap;flex-shrink:0}
 .hdr-btn:active{background:rgba(255,255,255,.34)}
 #mainContent{flex:1;overflow-y:auto;padding-bottom:76px;-webkit-overflow-scrolling:touch}
 nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);display:flex;z-index:50;height:58px;padding-bottom:env(safe-area-inset-bottom)}
-.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11px;font-weight:600;color:var(--muted);border:none;background:none;cursor:pointer;padding:4px 0;min-height:44px}
-.nav-item .ico{font-size:19px;line-height:1}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12.6px;font-weight:600;color:var(--muted);border:none;background:none;cursor:pointer;padding:4px 0;min-height:44px}
+.nav-item .ico{font-size:21.8px;line-height:1}
 .nav-item.active{color:var(--primary)}
 .view{display:none;padding:12px}
 .view.active{display:block}
 
 .card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:10px;overflow:hidden}
 .sec{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:10px;overflow:hidden}
-.sec-title{padding:10px 13px;font-size:12px;font-weight:800;color:var(--muted);border-bottom:1px solid var(--border);background:#f8fafc;letter-spacing:.4px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.sec-title{padding:10px 13px;font-size:13.8px;font-weight:800;color:var(--muted);border-bottom:1px solid var(--border);background:#f8fafc;letter-spacing:.4px;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .sec-body{padding:13px;display:flex;flex-direction:column;gap:11px}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .form-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .fg{display:flex;flex-direction:column;gap:4px}
-.fg label{font-size:12px;font-weight:700;color:var(--muted)}
-input,select,textarea{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;font-family:inherit;outline:none;background:#fff;color:var(--text);-webkit-appearance:none;appearance:none}
+.fg label{font-size:13.8px;font-weight:700;color:var(--muted)}
+input,select,textarea{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:17.2px;font-family:inherit;outline:none;background:#fff;color:var(--text);-webkit-appearance:none;appearance:none}
 input:focus,select:focus,textarea:focus{border-color:var(--primary)}
 textarea{resize:vertical;min-height:70px;line-height:1.6}
 select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
 input[type=checkbox]{width:auto;-webkit-appearance:checkbox;appearance:checkbox}
 
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:11px 16px;border-radius:10px;border:none;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:11px 16px;border-radius:10px;border:none;font-size:17.2px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px}
 .btn:active{transform:scale(.97)}
 .btn-primary{background:var(--primary);color:#fff}
 .btn-outline{background:#fff;color:var(--text);border:1.5px solid var(--border)}
 .btn-danger{background:var(--red);color:#fff}
 .btn-full{width:100%}
-.btn-sm{padding:7px 12px;font-size:13px;border-radius:8px;min-height:36px}
+.btn-sm{padding:7px 12px;font-size:14.9px;border-radius:8px;min-height:36px}
 .btn:disabled{opacity:.45;pointer-events:none}
 
 .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
 .stat-card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);padding:12px 6px;text-align:center;cursor:pointer}
 .stat-card:active{transform:scale(.97)}
 .stat-card.active{border-color:var(--primary);background:var(--primary-light)}
-.stat-num{font-size:26px;font-weight:800;line-height:1.15}
-.stat-label{font-size:13px;color:var(--muted);margin-top:2px;font-weight:700}
+.stat-num{font-size:29.9px;font-weight:800;line-height:1.15}
+.stat-label{font-size:14.9px;color:var(--muted);margin-top:2px;font-weight:700}
 
 .progress-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px}
 .progress-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px}
-.progress-pct{font-size:30px;font-weight:800;color:var(--primary)}
-.progress-sub{font-size:13px;color:var(--muted);font-weight:600}
+.progress-pct{font-size:34.5px;font-weight:800;color:var(--primary)}
+.progress-sub{font-size:14.9px;color:var(--muted);font-weight:600}
 .pbar{height:14px;border-radius:8px;background:#e2e8f0;overflow:hidden;display:flex}
 .pbar span{display:block;height:100%}
 
 .chips{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;margin-bottom:11px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
-.chip{flex-shrink:0;padding:8px 15px;border-radius:22px;border:1.5px solid var(--border);background:#fff;font-size:15px;font-weight:700;color:var(--muted);cursor:pointer;white-space:nowrap}
+.chip{flex-shrink:0;padding:8px 15px;border-radius:22px;border:1.5px solid var(--border);background:#fff;font-size:17.2px;font-weight:700;color:var(--muted);cursor:pointer;white-space:nowrap}
 .chip.active{background:var(--primary);color:#fff;border-color:var(--primary)}
 
 .floor-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(66px,1fr));gap:6px}
 .unit-tile{border:1.5px solid var(--border);border-radius:9px;padding:7px 3px 6px;text-align:center;cursor:pointer;background:#fff;position:relative;min-height:56px;display:flex;flex-direction:column;justify-content:center;gap:2px}
 .unit-tile:active{transform:scale(.95)}
-.unit-tile .u-ho{font-size:16px;font-weight:800;line-height:1}
-.unit-tile .u-sub{font-size:10px;font-weight:700;line-height:1.15;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
-.unit-tile .u-dot{position:absolute;top:4px;right:4px;font-size:9px}
+.unit-tile .u-ho{font-size:18.4px;font-weight:800;line-height:1}
+.unit-tile .u-sub{font-size:11.5px;font-weight:700;line-height:1.15;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
+.unit-tile .u-dot{position:absolute;top:4px;right:4px;font-size:10.3px}
 .st-todo{background:#fff;border-color:#e2e8f0;color:#475569}
 .st-contacted{background:var(--yellow-bg);border-color:#fcd34d;color:#92400e}
 .st-booked{background:var(--blue-bg);border-color:#93c5fd;color:#1e40af}
@@ -93,83 +93,85 @@ input[type=checkbox]{width:auto;-webkit-appearance:checkbox;appearance:checkbox}
 .st-hold{background:var(--red-bg);border-color:#fca5a5;color:#991b1b}
 .st-vacant{background:#f1f5f9;border-color:#e2e8f0;color:#94a3b8}
 
-.legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;font-size:12px;font-weight:700;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;font-size:13.8px;font-weight:700;color:var(--muted)}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:4px;border:1.5px solid;margin-right:4px;vertical-align:-1px}
 
 .ulist-item{display:flex;align-items:center;gap:10px;padding:11px 12px;border-bottom:1px solid var(--border);cursor:pointer;background:#fff}
 .ulist-item:last-child{border-bottom:none}
 .ulist-item:active{background:#f8fafc}
-.ul-ho{font-size:17px;font-weight:800;min-width:52px}
+.ul-ho{font-size:19.5px;font-weight:800;min-width:52px}
 .ul-mid{flex:1;min-width:0}
-.ul-name{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ul-meta{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.badge{padding:4px 10px;border-radius:20px;font-size:12px;font-weight:800;white-space:nowrap;border:1.5px solid}
+.ul-name{font-size:17.2px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ul-meta{font-size:13.8px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge{padding:4px 10px;border-radius:20px;font-size:13.8px;font-weight:800;white-space:nowrap;border:1.5px solid}
 
 .modal{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:100;display:none;align-items:flex-end;justify-content:center}
 .modal.open{display:flex}
 .modal-box{background:var(--bg);width:100%;max-width:560px;max-height:92dvh;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden}
 .modal-head{background:var(--card);padding:13px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
-.modal-head h2{font-size:19px;font-weight:800;flex:1}
+.modal-head h2{font-size:21.8px;font-weight:800;flex:1}
 .modal-body{overflow-y:auto;padding:12px;flex:1}
 .modal-foot{background:var(--card);border-top:1px solid var(--border);padding:10px 12px;display:flex;gap:8px;flex-shrink:0;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
-.x-btn{background:#f1f5f9;border:none;border-radius:8px;width:34px;height:34px;font-size:19px;cursor:pointer;color:var(--muted);flex-shrink:0}
+.x-btn{background:#f1f5f9;border:none;border-radius:8px;width:34px;height:34px;font-size:21.8px;cursor:pointer;color:var(--muted);flex-shrink:0}
 
 .seg{display:grid;gap:6px}
-.seg-btn{padding:10px 6px;border-radius:9px;border:1.5px solid var(--border);background:#fff;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer;text-align:center;line-height:1.3}
+.seg-btn{padding:10px 6px;border-radius:9px;border:1.5px solid var(--border);background:#fff;font-size:16.1px;font-weight:700;color:var(--muted);cursor:pointer;text-align:center;line-height:1.3}
 .seg-btn.on{background:var(--primary);border-color:var(--primary);color:#fff}
 .seg-btn.on-warn{background:var(--orange);border-color:var(--orange);color:#fff}
 
-.eq-row{display:flex;align-items:center;gap:9px;padding:9px 11px;border:1.5px solid var(--border);border-radius:9px;background:#fff;cursor:pointer;font-size:15px;font-weight:700}
+.eq-row{display:flex;align-items:center;gap:9px;padding:9px 11px;border:1.5px solid var(--border);border-radius:9px;background:#fff;cursor:pointer;font-size:17.2px;font-weight:700}
 .eq-row.on{background:var(--green-bg);border-color:#86efac;color:#166534}
-.eq-row .eq-box{width:22px;height:22px;border-radius:6px;border:2px solid #cbd5e1;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:#fff}
+.eq-row .eq-box{width:22px;height:22px;border-radius:6px;border:2px solid #cbd5e1;display:flex;align-items:center;justify-content:center;font-size:16.1px;flex-shrink:0;background:#fff}
 .eq-row.on .eq-box{background:var(--green);border-color:var(--green);color:#fff}
 
 .pin-mask{display:flex;gap:8px;align-items:center}
 .pin-mask input{flex:1;letter-spacing:2px;font-weight:800}
 
 .slot-day{margin-bottom:12px}
-.slot-day-head{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;background:var(--primary);color:#fff;border-radius:10px 10px 0 0;font-size:16px;font-weight:800}
-.slot-day-head .sd-cnt{font-size:13px;font-weight:700;background:rgba(255,255,255,.22);padding:3px 10px;border-radius:14px}
+.slot-day-head{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;background:var(--primary);color:#fff;border-radius:10px 10px 0 0;font-size:18.4px;font-weight:800}
+.slot-day-head .sd-cnt{font-size:14.9px;font-weight:700;background:rgba(255,255,255,.22);padding:3px 10px;border-radius:14px}
 .slot-row{display:flex;align-items:center;gap:9px;padding:10px 12px;border:1px solid var(--border);border-top:none;background:#fff;cursor:pointer}
 .slot-row:last-child{border-radius:0 0 10px 10px}
 .slot-row:active{background:#f8fafc}
-.slot-time{font-size:15px;font-weight:800;min-width:96px}
+.slot-time{font-size:17.2px;font-weight:800;min-width:96px}
 .slot-bar{flex:1;height:9px;border-radius:6px;background:#e2e8f0;overflow:hidden}
 .slot-bar span{display:block;height:100%;background:var(--primary)}
 .slot-bar span.full{background:var(--red)}
-.slot-n{font-size:14px;font-weight:800;color:var(--muted);min-width:52px;text-align:right}
+.slot-n{font-size:16.1px;font-weight:800;color:var(--muted);min-width:52px;text-align:right}
 
 .day-tabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:11px;scrollbar-width:none}
 .day-tabs::-webkit-scrollbar{display:none}
 .day-tab{flex-shrink:0;padding:8px 13px;border-radius:10px;border:1.5px solid var(--border);background:#fff;cursor:pointer;text-align:center;min-width:64px}
 .day-tab.active{background:var(--primary);border-color:var(--primary);color:#fff}
-.day-tab .dt-d{font-size:15px;font-weight:800;line-height:1.1}
-.day-tab .dt-w{font-size:11px;font-weight:700;opacity:.75;margin-top:1px}
+.day-tab .dt-d{font-size:17.2px;font-weight:800;line-height:1.1}
+.day-tab .dt-w{font-size:12.6px;font-weight:700;opacity:.75;margin-top:1px}
 
 .empty{text-align:center;padding:48px 20px;color:var(--muted)}
-.empty .ico{font-size:44px;margin-bottom:8px}
-.empty p{font-size:14px;margin-top:6px;line-height:1.6}
+.empty .ico{font-size:50.6px;margin-bottom:8px}
+.empty p{font-size:16.1px;margin-top:6px;line-height:1.6}
 
-.toast{position:fixed;bottom:76px;left:50%;transform:translateX(-50%) translateY(20px);background:#1e293b;color:#fff;padding:11px 18px;border-radius:22px;font-size:14px;font-weight:600;z-index:200;opacity:0;transition:.25s;pointer-events:none;max-width:88%;text-align:center;line-height:1.5}
+.toast{position:fixed;bottom:76px;left:50%;transform:translateX(-50%) translateY(20px);background:#1e293b;color:#fff;padding:11px 18px;border-radius:22px;font-size:16.1px;font-weight:600;z-index:200;opacity:0;transition:.25s;pointer-events:none;max-width:88%;text-align:center;line-height:1.5}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
 .cloud-status{padding:10px 12px;background:#f8fafc;border-radius:8px;border:1px solid var(--border)}
-.cs-l1{font-size:14px;font-weight:700}
-.cs-l2{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5}
-.help{font-size:12px;color:var(--muted);line-height:1.7;padding:9px 11px;background:#f8fafc;border-radius:7px;border:1px dashed var(--border)}
-.help pre{background:#fff;padding:7px;border-radius:5px;overflow-x:auto;margin-top:5px;font-size:10.5px;border:1px solid var(--border);line-height:1.5}
+.cs-l1{font-size:16.1px;font-weight:700}
+.cs-l2{font-size:13.8px;color:var(--muted);margin-top:3px;line-height:1.5}
+.help{font-size:13.8px;color:var(--muted);line-height:1.7;padding:9px 11px;background:#f8fafc;border-radius:7px;border:1px dashed var(--border)}
+.help pre{background:#fff;padding:7px;border-radius:5px;overflow-x:auto;margin-top:5px;font-size:12.1px;border:1px solid var(--border);line-height:1.5}
 .help ol{margin-left:16px}
 .help li{margin-bottom:4px}
-.warn{background:var(--yellow-bg);border:1px solid #fcd34d;color:#92400e;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:600;line-height:1.6}
-.info{background:var(--blue-bg);border:1px solid #93c5fd;color:#1e40af;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:600;line-height:1.6}
+.warn{background:var(--yellow-bg);border:1px solid #fcd34d;color:#92400e;padding:10px 12px;border-radius:8px;font-size:14.9px;font-weight:600;line-height:1.6}
+.info{background:var(--blue-bg);border:1px solid #93c5fd;color:#1e40af;padding:10px 12px;border-radius:8px;font-size:14.9px;font-weight:600;line-height:1.6}
 
-table.tbl{width:100%;border-collapse:collapse;font-size:14px}
+table.tbl{width:100%;border-collapse:collapse;font-size:16.1px}
 table.tbl th,table.tbl td{padding:8px 9px;border-bottom:1px solid var(--border);text-align:left}
-table.tbl th{background:#f8fafc;font-size:12px;font-weight:800;color:var(--muted)}
-table.tbl td.num{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+table.tbl th{background:#f8fafc;font-size:13.8px;font-weight:800;color:var(--muted)}
+/* 숫자 열은 가운데 정렬 — 머리글과 값이 같은 축에 오도록 */
+table.tbl th:not(:first-child),table.tbl td:not(:first-child){text-align:center}
+table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
 
 .link-box{display:flex;gap:6px;align-items:stretch}
-.link-box input{font-size:12.5px;font-family:ui-monospace,monospace}
+.link-box input{font-size:14.4px;font-family:ui-monospace,monospace}
 
 @media print{
   header,nav,.no-print,.modal{display:none!important}
@@ -177,7 +179,7 @@ table.tbl td.num{text-align:right;font-weight:700;font-variant-numeric:tabular-n
   body,html{height:auto;background:#fff}
   .view{padding:0}
   .print-only{display:block!important}
-  table.tbl{font-size:11px}
+  table.tbl{font-size:12.6px}
   table.tbl th,table.tbl td{padding:4px 5px;border-bottom:1px solid #999}
   .sec{border:none;box-shadow:none;margin-bottom:8px}
   .sec-title{background:#eee;border-bottom:1px solid #999}
@@ -205,7 +207,7 @@ table.tbl td.num{text-align:right;font-weight:700;font-variant-numeric:tabular-n
             <div class="progress-sub" id="dSub">세대 정보를 먼저 등록하세요</div>
           </div>
           <div style="text-align:right">
-            <div style="font-size:22px;font-weight:800" id="dDone">0</div>
+            <div style="font-size:25.3px;font-weight:800" id="dDone">0</div>
             <div class="progress-sub">완료</div>
           </div>
         </div>
@@ -222,6 +224,11 @@ table.tbl td.num{text-align:right;font-weight:700;font-variant-numeric:tabular-n
       <div class="sec">
         <div class="sec-title">⚠️ 조치 필요</div>
         <div id="dAlerts"></div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-title">장비 회수 현황</div>
+        <div id="dEquip"></div>
       </div>
 
       <div class="sec">
@@ -333,7 +340,7 @@ table.tbl td.num{text-align:right;font-weight:700;font-variant-numeric:tabular-n
           </div>
           <div id="cloudBtns" style="display:flex;gap:8px"></div>
           <details>
-            <summary style="font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;padding:6px 0">Firebase 설정 열기 / 규칙 안내</summary>
+            <summary style="font-size:14.9px;font-weight:700;color:var(--muted);cursor:pointer;padding:6px 0">Firebase 설정 열기 / 규칙 안내</summary>
             <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
               <div class="help">
                 이 앱은 기존 <strong>시설일지 앱과 완전히 별개</strong>로 돌아갑니다. 저장 위치·설정·캐시가 모두 분리되어 있어 서로 영향을 주지 않습니다.
@@ -349,7 +356,7 @@ table.tbl td.num{text-align:right;font-weight:700;font-variant-numeric:tabular-n
               </div>
               <div class="fg">
                 <label>firebaseConfig 붙여넣기</label>
-                <textarea id="fbConfigInput" placeholder='{ "apiKey": "...", "authDomain": "...", "projectId": "...", ... }' style="font-family:ui-monospace,monospace;font-size:12px"></textarea>
+                <textarea id="fbConfigInput" placeholder='{ "apiKey": "...", "authDomain": "...", "projectId": "...", ... }' style="font-family:ui-monospace,monospace;font-size:13.8px"></textarea>
               </div>
               <button class="btn btn-primary btn-full" onclick="saveFbConfig()">설정 저장</button>
             </div>
@@ -368,7 +375,7 @@ table.tbl td.num{text-align:right;font-weight:700;font-variant-numeric:tabular-n
               <button class="btn btn-outline btn-sm" onclick="copyBookUrl()">복사</button>
             </div>
           </div>
-          <label style="display:flex;align-items:center;gap:9px;font-size:15px;font-weight:700;cursor:pointer">
+          <label style="display:flex;align-items:center;gap:9px;font-size:17.2px;font-weight:700;cursor:pointer">
             <input type="checkbox" id="cfgBookingOpen" onchange="saveConfigFromForm()"> 입주민 예약 접수 열기
           </label>
           <div class="help">접수를 닫으면 예약 페이지에서 "접수 마감" 안내가 나오고 새 예약이 들어오지 않습니다. 이미 확정된 예약은 그대로 유지됩니다.</div>
@@ -392,11 +399,11 @@ table.tbl td.num{text-align:right;font-weight:700;font-variant-numeric:tabular-n
       <div class="sec">
         <div class="sec-title">시간대 설정</div>
         <div class="sec-body">
-          <div class="fg"><label style="font-size:13px;color:var(--text)">평일 시간대 (월~금)</label><div id="cfgSlotsweekday"></div>
+          <div class="fg"><label style="font-size:14.9px;color:var(--text)">평일 시간대 (월~금)</label><div id="cfgSlotsweekday"></div>
             <button class="btn btn-outline btn-sm" onclick="addSlot('weekday')">+ 평일 시간대 추가</button></div>
-          <div class="fg"><label style="font-size:13px;color:var(--text)">토요일 시간대</label><div id="cfgSlotssat"></div>
+          <div class="fg"><label style="font-size:14.9px;color:var(--text)">토요일 시간대</label><div id="cfgSlotssat"></div>
             <button class="btn btn-outline btn-sm" onclick="addSlot('sat')">+ 토요일 시간대 추가</button></div>
-          <div class="fg"><label style="font-size:13px;color:var(--text)">일요일 시간대</label><div id="cfgSlotssun"></div>
+          <div class="fg"><label style="font-size:14.9px;color:var(--text)">일요일 시간대</label><div id="cfgSlotssun"></div>
             <button class="btn btn-outline btn-sm" onclick="addSlot('sun')">+ 일요일 시간대 추가</button></div>
           <div class="help"><strong>정원</strong>은 그 시간대에 받을 수 있는 세대 수입니다. 기사 인원 × 시간당 처리 세대로 잡으세요. 정원이 차면 입주민 예약 페이지에서 그 시간대가 <strong>마감</strong>으로 표시됩니다.</div>
           <div id="capCheck"></div>
@@ -483,8 +490,14 @@ const PRESENCE = {
   vacant:    '공실',
 };
 
-// 회수 2종 + 설치 2종
-const EQUIP = [
+// 회수 4종 (공유기·셋톱박스·리모컨·전원코드) / 설치 2종 (공유기·셋톱박스)
+const EQUIP_RET = [
+  { key:'router', label:'인터넷 공유기' },
+  { key:'stb',    label:'셋톱박스' },
+  { key:'remote', label:'리모컨' },
+  { key:'power',  label:'전원코드' },
+];
+const EQUIP_INS = [
   { key:'router', label:'인터넷 공유기' },
   { key:'stb',    label:'셋톱박스' },
 ];
@@ -666,8 +679,10 @@ function saveLocal(){
   }catch(e){ toast('⚠️ 저장 공간이 부족합니다'); }
 }
 function normalizeUnit(u){
-  if(!u.ret) u.ret = { router:false, stb:false };
-  if(!u.ins) u.ins = { router:false, stb:false };
+  if(!u.ret) u.ret = {};
+  if(!u.ins) u.ins = {};
+  EQUIP_RET.forEach(e=>{ if(typeof u.ret[e.key]!=='boolean') u.ret[e.key]=false; });
+  EQUIP_INS.forEach(e=>{ if(typeof u.ins[e.key]!=='boolean') u.ins[e.key]=false; });
   if(!u.status) u.status = 'todo';
   if(u.presence===undefined) u.presence = '';
   if(!u.sn) u.sn = { router:'', stb:'' };
@@ -748,8 +763,8 @@ function renderDash(){
   const alerts = [];
   units.filter(u=>u.status==='absent').forEach(u=>alerts.push([u,'재방문 필요']));
   units.filter(u=>u.status==='hold').forEach(u=>alerts.push([u,'보류·거부 — 확인 필요']));
-  units.filter(u=>u.status==='done' && !(u.ret.router && u.ret.stb)).forEach(u=>{
-    const miss = EQUIP.filter(e=>!u.ret[e.key]).map(e=>e.label).join('·');
+  units.filter(u=>u.status==='done' && EQUIP_RET.some(e=>!u.ret[e.key])).forEach(u=>{
+    const miss = EQUIP_RET.filter(e=>!u.ret[e.key]).map(e=>e.label).join('·');
     alerts.push([u,'미회수: '+miss]);
   });
   const past = config.days.map(d=>d.date).filter(d=>d && d<t);
@@ -768,6 +783,25 @@ function renderDash(){
         </div>`).join('')
     : `<div class="empty" style="padding:26px"><div class="ico">✅</div><p>조치할 항목이 없습니다</p></div>`;
 
+  // 장비 회수 현황 — 완료 세대 기준으로 얼마나 걷혔는지
+  const doneN = c.done||0;
+  $('dEquip').innerHTML = EQUIP_RET.map(e=>{
+    const got = units.filter(u=>u.ret[e.key]).length;
+    const miss = units.filter(u=>u.status==='done' && !u.ret[e.key]).length;
+    const pct = doneN ? Math.min(100, got/doneN*100) : 0;
+    return `<div class="slot-row" style="cursor:default">
+      <div class="slot-time" style="min-width:104px">${e.label}</div>
+      <div class="slot-bar"><span class="${miss?'full':''}" style="width:${pct}%"></span></div>
+      <div class="slot-n">${got}/${doneN}</div>
+      <div style="font-size:13.8px;font-weight:800;min-width:64px;text-align:right;color:${miss?'var(--red)':'var(--muted)'}">
+        ${miss?'미회수 '+miss:'—'}
+      </div>
+    </div>`;
+  }).join('') +
+  `<div style="padding:9px 13px;font-size:14.9px;color:var(--muted);line-height:1.5">
+     작업완료 ${doneN}세대 기준입니다. 미회수가 있으면 위 "조치 필요"에도 표시됩니다.
+   </div>`;
+
   // 작업일별
   $('dDays').innerHTML = config.days.filter(d=>d.date).map(d=>{
     const list = units.filter(u=>u.date===d.date);
@@ -778,7 +812,7 @@ function renderDash(){
       <div class="slot-time">${fmtDate(d.date)}</div>
       <div class="slot-bar"><span style="width:${p}%"></span></div>
       <div class="slot-n">${dn}/${list.length}</div>
-      <div style="font-size:11px;color:var(--muted);min-width:46px;text-align:right">정원${cap}</div>
+      <div style="font-size:12.6px;color:var(--muted);min-width:46px;text-align:right">정원${cap}</div>
     </div>`;
   }).join('') || `<div class="empty" style="padding:22px"><p>설정에서 작업일을 등록하세요</p></div>`;
 }
@@ -951,7 +985,7 @@ function openUnit(id){
     <div class="sec">
       <div class="sec-title">장비 회수 (기존)</div>
       <div class="sec-body">
-        ${EQUIP.map(e=>`
+        ${EQUIP_RET.map(e=>`
           <div class="eq-row ${u.ret[e.key]?'on':''}" data-k="ret_${e.key}" onclick="toggleEq(this)">
             <div class="eq-box">${u.ret[e.key]?'✓':''}</div>${e.label} 회수
           </div>`).join('')}
@@ -961,7 +995,7 @@ function openUnit(id){
     <div class="sec">
       <div class="sec-title">장비 설치 (신규)</div>
       <div class="sec-body">
-        ${EQUIP.map(e=>`
+        ${EQUIP_INS.map(e=>`
           <div class="eq-row ${u.ins[e.key]?'on':''}" data-k="ins_${e.key}" onclick="toggleEq(this)">
             <div class="eq-box">${u.ins[e.key]?'✓':''}</div>${e.label} 설치
           </div>`).join('')}
@@ -1036,9 +1070,13 @@ function saveUnitModal(){
   u.slot = $('umSlot').value;
   u.tech = $('umTech').value;
   u.sn = { router: $('umSnRouter').value.trim(), stb: $('umSnStb').value.trim() };
-  EQUIP.forEach(e=>{
-    u.ret[e.key] = document.querySelector(`[data-k="ret_${e.key}"]`).classList.contains('on');
-    u.ins[e.key] = document.querySelector(`[data-k="ins_${e.key}"]`).classList.contains('on');
+  EQUIP_RET.forEach(e=>{
+    const el = document.querySelector(`[data-k="ret_${e.key}"]`);
+    if(el) u.ret[e.key] = el.classList.contains('on');
+  });
+  EQUIP_INS.forEach(e=>{
+    const el = document.querySelector(`[data-k="ins_${e.key}"]`);
+    if(el) u.ins[e.key] = el.classList.contains('on');
   });
   const newStatus = segValue('umStatus');
   u.status = newStatus || 'todo';
@@ -1076,7 +1114,7 @@ function renderSched(){
           <div class="slot-time">${s.from}~${s.to}</div>
           <div class="slot-bar"><span class="${n>=capN&&capN?'full':''}" style="width:${pct}%"></span></div>
           <div class="slot-n">${n}/${capN}</div>
-          <div style="font-size:11px;color:var(--green);font-weight:800;min-width:40px;text-align:right">✓${dn}</div>
+          <div style="font-size:12.6px;color:var(--green);font-weight:800;min-width:40px;text-align:right">✓${dn}</div>
         </div>`;
       }).join('');
       const unassigned = dayList.filter(u=>!u.slot).length;
@@ -1229,33 +1267,33 @@ function renderWorksheet(){
       ? (u.pin ? `<strong>${esc(u.pin)}</strong>` : '<span style="color:#ef4444">비번 미입력</span>')
       : (PRESENCE[u.presence]||'—');
     return `<tr>
-      <td style="font-weight:800;font-size:15px">${esc(u.ho)}</td>
+      <td style="font-weight:800;font-size:17.2px">${esc(u.ho)}</td>
       <td>${esc(slotLabel(date,u.slot)||'미정')}</td>
       <td>${esc(u.name||'')}</td>
       <td>${esc(u.phone||'')}</td>
       <td>${pinCell}</td>
       <td>${esc(u.tech||'')}</td>
-      <td style="letter-spacing:3px">☐☐</td>
-      <td style="letter-spacing:3px">☐☐</td>
+      <td style="letter-spacing:3px;white-space:nowrap">☐☐☐☐</td>
+      <td style="letter-spacing:3px;white-space:nowrap">☐☐</td>
       <td style="min-width:70px"></td>
     </tr>`;
   }).join('');
 
   $('wsBody').innerHTML = `
     <div class="sec">
-      <div class="sec-title" style="font-size:14px;color:var(--text)">${esc(title)} — ${fmtDate(date)}${tech&&tech!=='__none__'?' / '+esc(tech):''} (${list.length}세대)</div>
+      <div class="sec-title" style="font-size:16.1px;color:var(--text)">${esc(title)} — ${fmtDate(date)}${tech&&tech!=='__none__'?' / '+esc(tech):''} (${list.length}세대)</div>
       <div style="overflow-x:auto">
         <table class="tbl">
           <thead><tr>
             <th>호실</th><th>시간</th><th>성명</th><th>연락처</th><th>비번/재실</th><th>기사</th>
-            <th>회수<br><span style="font-weight:600">공유기·셋톱</span></th>
+            <th>회수<br><span style="font-weight:600">공유기·셋톱·리모컨·전원</span></th>
             <th>설치<br><span style="font-weight:600">공유기·셋톱</span></th>
             <th>확인</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
-      <div style="padding:9px 12px;font-size:11.5px;color:var(--muted);line-height:1.6">
+      <div style="padding:9px 12px;font-size:13.2px;color:var(--muted);line-height:1.6">
         ※ 비밀번호가 적힌 지시서는 <strong>작업 당일 사용 후 반드시 파쇄</strong>하십시오.
       </div>
     </div>`;
@@ -1290,16 +1328,18 @@ function renderStats(){
 
   const doneList = units.filter(u=>u.status==='done');
   $('stEquip').innerHTML = `<thead><tr><th>장비</th><th class="num">회수</th><th class="num">설치</th><th class="num">미회수</th></tr></thead><tbody>` +
-    EQUIP.map(e=>{
+    EQUIP_RET.map(e=>{
       const r = units.filter(u=>u.ret[e.key]).length;
-      const i = units.filter(u=>u.ins[e.key]).length;
+      const hasIns = EQUIP_INS.some(x=>x.key===e.key);
+      const i = hasIns ? units.filter(u=>u.ins[e.key]).length : null;
       const miss = doneList.filter(u=>!u.ret[e.key]).length;
-      return `<tr><td>${e.label}</td><td class="num">${r}</td><td class="num">${i}</td>
+      return `<tr><td>${e.label}</td><td class="num">${r}</td>
+        <td class="num">${i===null?'—':i}</td>
         <td class="num" style="color:${miss?'var(--red)':'inherit'}">${miss}</td></tr>`;
     }).join('') +
     `<tr style="background:#f8fafc"><td><strong>합계</strong></td>
-      <td class="num"><strong>${EQUIP.reduce((s,e)=>s+units.filter(u=>u.ret[e.key]).length,0)}</strong></td>
-      <td class="num"><strong>${EQUIP.reduce((s,e)=>s+units.filter(u=>u.ins[e.key]).length,0)}</strong></td>
+      <td class="num"><strong>${EQUIP_RET.reduce((s,e)=>s+units.filter(u=>u.ret[e.key]).length,0)}</strong></td>
+      <td class="num"><strong>${EQUIP_INS.reduce((s,e)=>s+units.filter(u=>u.ins[e.key]).length,0)}</strong></td>
       <td class="num"></td></tr></tbody>`;
 }
 
@@ -1322,21 +1362,25 @@ function downloadCsv(filename, rows){
 }
 function exportCsv(){
   const rows = [['호실','층','이름','연락처','재실유형','작업일','시간대','기사','상태',
-                 '공유기회수','셋톱회수','공유기설치','셋톱설치','공유기S/N','셋톱S/N','메모']];
+                 '공유기회수','셋톱회수','리모컨회수','전원코드회수','공유기설치','셋톱설치',
+                 '공유기S/N','셋톱S/N','메모']];
   units.slice().sort((a,b)=>a.floor-b.floor||String(a.ho).localeCompare(String(b.ho))).forEach(u=>{
     rows.push([u.ho,u.floor,u.name||'',u.phone||'',PRESENCE[u.presence]||'',
       u.date||'', slotLabel(u.date,u.slot), u.tech||'', STATUS[u.status].label,
-      u.ret.router?'O':'', u.ret.stb?'O':'', u.ins.router?'O':'', u.ins.stb?'O':'',
+      u.ret.router?'O':'', u.ret.stb?'O':'', u.ret.remote?'O':'', u.ret.power?'O':'',
+      u.ins.router?'O':'', u.ins.stb?'O':'',
       u.sn.router||'', u.sn.stb||'', u.note||'']);
   });
   downloadCsv(`장비교체_세대현황_${todayStr()}.csv`, rows);
 }
 function exportEquipCsv(){
-  const rows = [['호실','이름','작업일','기사','공유기회수','셋톱회수','공유기설치','셋톱설치','공유기S/N','셋톱S/N','미회수사유']];
-  units.filter(u=>u.status==='done'||u.ret.router||u.ret.stb).forEach(u=>{
-    const miss = EQUIP.filter(e=>!u.ret[e.key]).map(e=>e.label).join('·');
+  const rows = [['호실','이름','작업일','기사','공유기회수','셋톱회수','리모컨회수','전원코드회수',
+                 '공유기설치','셋톱설치','공유기S/N','셋톱S/N','미회수사유']];
+  units.filter(u=>u.status==='done'||EQUIP_RET.some(e=>u.ret[e.key])).forEach(u=>{
+    const miss = EQUIP_RET.filter(e=>!u.ret[e.key]).map(e=>e.label).join('·');
     rows.push([u.ho,u.name||'',u.date||'',u.tech||'',
-      u.ret.router?'O':'X', u.ret.stb?'O':'X', u.ins.router?'O':'X', u.ins.stb?'O':'X',
+      u.ret.router?'O':'X', u.ret.stb?'O':'X', u.ret.remote?'O':'X', u.ret.power?'O':'X',
+      u.ins.router?'O':'X', u.ins.stb?'O':'X',
       u.sn.router||'', u.sn.stb||'', miss?`미회수(${miss}) ${u.note||''}`:'']);
   });
   downloadCsv(`장비회수대장_${todayStr()}.csv`, rows);
@@ -1417,7 +1461,7 @@ function renderSettings(){
   $('cfgDays').innerHTML = config.days.map((d,i)=>`
     <div style="display:flex;gap:7px;align-items:center;margin-bottom:7px">
       <input type="date" value="${escA(d.date||'')}" onchange="setDay(${i}, this.value)" style="flex:1">
-      <span style="font-size:13px;font-weight:800;color:var(--muted);min-width:52px">${d.date?SLOT_KIND_LABEL[slotKindOf(d.date)]:''}</span>
+      <span style="font-size:14.9px;font-weight:800;color:var(--muted);min-width:52px">${d.date?SLOT_KIND_LABEL[slotKindOf(d.date)]:''}</span>
       <button class="btn btn-outline btn-sm" onclick="delDay(${i})" style="color:var(--red)">삭제</button>
     </div>`).join('');
 
@@ -1447,7 +1491,7 @@ function renderSettings(){
 
   // 층 규칙
   $('cfgFloors').innerHTML = config.floorRules.map((r,i)=>`
-    <div style="display:flex;gap:5px;align-items:center;margin-bottom:7px;font-size:13px;font-weight:700">
+    <div style="display:flex;gap:5px;align-items:center;margin-bottom:7px;font-size:14.9px;font-weight:700">
       <input type="number" value="${r.from}" onchange="setFR(${i},'from',this.value)" style="width:56px;padding:8px;text-align:center">
       <span>~</span>
       <input type="number" value="${r.to}" onchange="setFR(${i},'to',this.value)" style="width:56px;padding:8px;text-align:center">
