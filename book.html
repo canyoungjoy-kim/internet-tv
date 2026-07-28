@@ -264,10 +264,20 @@ async function boot(){
       import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-firestore.js`),
     ]);
     fbm = Object.assign({}, fsMod);
-    const app = initializeApp(cfg);
-    const auth = authMod.getAuth(app);
+
+    /* 관리자 앱과 같은 주소(origin)를 쓰기 때문에, 기본 앱으로 익명 로그인을 하면
+       관리자의 Google 로그인이 덮어써져 로그아웃됩니다.
+       이름 있는 앱('ittv-booking')으로 따로 띄우면 로그인 정보가 별도 칸에 저장되어
+       서로 건드리지 않습니다. */
+    const app = initializeApp(cfg, 'ittv-booking');
+    const auth = authMod.initializeAuth(app, { persistence: authMod.browserLocalPersistence });
     db = fsMod.getFirestore(app);
-    if(!auth.currentUser) await authMod.signInAnonymously(auth);
+
+    // 이전 방문의 익명 계정이 남아 있으면 재사용하고, 없을 때만 새로 만듭니다
+    const existing = await new Promise(res => {
+      const un = authMod.onAuthStateChanged(auth, u => { un(); res(u); });
+    });
+    if(!existing) await authMod.signInAnonymously(auth);
 
     const { doc, getDoc } = fsMod;
     const [pSnap, aSnap, rSnap] = await Promise.all([
