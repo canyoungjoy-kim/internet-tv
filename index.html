@@ -169,6 +169,15 @@ table.tbl th{background:#f8fafc;font-size:13.8px;font-weight:800;color:var(--mut
 table.tbl th:not(:first-child),table.tbl td:not(:first-child){text-align:center}
 table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
 
+/* ── 작업요청서 시트 ── 성명·연락처를 빼서 생긴 여유만큼 글씨를 키웁니다(약 +10%) */
+.ws-sheet table.tbl{font-size:17.7px}
+.ws-sheet table.tbl th{font-size:15.2px}
+.ws-sheet .nw{white-space:nowrap}
+/* 장비 칸: 머리글 글자와 체크박스가 같은 세로줄에 오도록 폭을 고정합니다 */
+.eq-h{display:flex;justify-content:center;gap:6px;white-space:nowrap;margin-top:3px}
+.eq-c{display:inline-block;min-width:3.4em;text-align:center;font-weight:700}
+.eq-b{font-size:1.15em;line-height:1.1}      /* 체크박스만 15% 크게 */
+
 .link-box{display:flex;gap:6px;align-items:stretch}
 .link-box input{font-size:14.4px;font-family:ui-monospace,monospace}
 
@@ -179,6 +188,9 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
   .view{padding:0}
   .print-only{display:block!important}
   table.tbl{font-size:12.6px}
+  .ws-sheet table.tbl{font-size:13.9px}
+  .ws-sheet table.tbl th{font-size:12.4px}
+  .eq-c{min-width:3.1em}
   table.tbl th,table.tbl td{padding:4px 5px;border-bottom:1px solid #999}
   .sec{border:none;box-shadow:none;margin-bottom:8px}
   .sec-title{background:#eee;border-bottom:1px solid #999}
@@ -299,14 +311,24 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
       </div>
     </div>
 
-    <!-- ══════════ 기사·작업지시 ══════════ -->
+    <!-- ══════════ 기사·작업요청 ══════════ -->
     <div class="view" id="v-tech">
       <div class="sec no-print">
-        <div class="sec-title">작업지시서 출력</div>
+        <div class="sec-title">작업요청서 출력</div>
         <div class="sec-body">
           <div class="form-row">
             <div class="fg"><label>작업일</label><select id="wsDate" onchange="renderWorksheet()"></select></div>
             <div class="fg"><label>기사</label><select id="wsTech" onchange="renderWorksheet()"></select></div>
+          </div>
+          <div class="fg personal-only" id="wsPersonalWrap">
+            <label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-weight:700">
+              <input type="checkbox" id="wsPersonal" onchange="renderWorksheet()" style="width:20px;height:20px;flex-shrink:0">
+              입주민 성명·연락처 함께 인쇄 (사무소 보관용)
+            </label>
+            <div class="help" style="border-color:var(--red);color:#991b1b">
+              <strong>설치기사에게 주는 작업요청서에는 절대 체크하지 마세요.</strong>
+              체크하지 않으면 성명·연락처는 인쇄되지 않습니다. 체크한 인쇄물은 개인정보이므로 사무소 밖으로 내보내지 말고 사용 후 파쇄하십시오.
+            </div>
           </div>
           <button class="btn btn-primary btn-full" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>
           <button class="btn btn-outline btn-full" onclick="copyDailySummary()">📋 이 날짜 마감 요약 복사</button>
@@ -340,6 +362,14 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
       <div class="sec no-print admin-only">
         <div class="sec-title">자료 내보내기 / 가져오기</div>
         <div class="sec-body">
+          <button class="btn btn-primary btn-full" onclick="openPlanDoc()">📄 사전회의용 계획문서 만들기 (인쇄)</button>
+          <div class="help">
+            예약 개시 전 <strong>설치팀과의 사전회의</strong>에 쓰는 요약 문서를 새 창으로 만듭니다.
+            세대 현황 · 날짜별 시간대별 정원 · 필요 인력 · 장비 물량 · 호텔 세대 처리방법이 들어가고,
+            부록으로 <strong>입주민 예약페이지 주의사항 · 작업요청서 샘플 · 예약화면 예시(부재·비번)</strong> 가 붙습니다.
+            새 창에서 <strong>인쇄</strong>를 누르면 종이 또는 PDF로 저장됩니다.<br>
+            개인정보(성명·연락처)는 <strong>들어가지 않습니다.</strong>
+          </div>
           <button class="btn btn-outline btn-full" onclick="exportCsv()">⬇ 전체 세대 CSV 내려받기</button>
           <button class="btn btn-outline btn-full" onclick="exportEquipCsv()">⬇ 장비 회수대장 CSV (정산용)</button>
           <button class="btn btn-outline btn-full" onclick="exportUnbookedCsv()">⬇ 미예약 세대 CSV (독촉 문자용)</button>
@@ -481,7 +511,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
     <button class="nav-item active" data-v="dash" onclick="switchView('dash')"><span class="ico">📊</span>대시보드</button>
     <button class="nav-item" data-v="units" onclick="switchView('units')"><span class="ico">🏢</span>세대</button>
     <button class="nav-item" data-v="sched" onclick="switchView('sched')"><span class="ico">📅</span>일정</button>
-    <button class="nav-item" data-v="tech" onclick="switchView('tech')"><span class="ico">🧾</span>작업지시</button>
+    <button class="nav-item" data-v="tech" onclick="switchView('tech')"><span class="ico">🧾</span>작업요청</button>
     <button class="nav-item" data-v="stats" onclick="switchView('stats')"><span class="ico">📈</span>통계</button>
   </nav>
 </div>
@@ -575,7 +605,10 @@ const EQUIP_RET = [
 const EQUIP_INS = [
   { key:'router', label:'인터넷 공유기' },
   { key:'stb',    label:'셋톱박스' },
+  { key:'remote', label:'리모컨' },
 ];
+// 작업요청서 표에 쓰는 짧은 이름
+const EQUIP_SHORT = { router:'공유기', stb:'셋톱', remote:'리모컨' };
 
 let units = [];        // 세대 배열 (개인정보 없음)
 let contacts = {};     // 호실 → { name, phone, phone4 }  — 관리자·직원만 내려받음
@@ -849,6 +882,12 @@ function applyRoleUI(){
   document.querySelectorAll('.admin-only').forEach(el=>{
     el.style.display = isAdmin() ? '' : 'none';
   });
+  // 개인정보 관련 조작 자체를 기사 계정에서는 숨깁니다
+  document.querySelectorAll('.personal-only').forEach(el=>{
+    el.style.display = canSeePersonal() ? '' : 'none';
+  });
+  const wp = $('wsPersonal');
+  if(wp && !canSeePersonal()) wp.checked = false;
   const t = $('hdrTitle');
   if(t) t.textContent = isAdmin() ? '인터넷·TV 장비교체'
                                   : `인터넷·TV 장비교체 · ${ROLE_LABEL[myRole]}`;
@@ -1436,7 +1475,7 @@ function assignTech(even){
   const techs = (config.techs||[]).map(t=>t.name);
 
   if(even){
-    if(!techs.length) return toast('먼저 작업지시 탭에서 기사를 등록하세요', 3500);
+    if(!techs.length) return toast('먼저 작업요청 탭에서 기사를 등록하세요', 3500);
     if(!confirm(`${list.length}세대를 기사 ${techs.length}명에게 균등 분배합니다.\n이미 배정된 기사도 바뀝니다. 계속할까요?`)) return;
     const per = Math.ceil(list.length / techs.length);
     list.forEach((u,i)=>{
@@ -1513,7 +1552,7 @@ function bulkAssign(){
 }
 
 /* ═══════════════════════════════════════════
-   기사 · 작업지시서
+   기사 · 작업요청서
    ═══════════════════════════════════════════ */
 function renderTechView(){
   const days = config.days.filter(d=>d.date);
@@ -1584,45 +1623,56 @@ function renderWorksheet(){
   else if(tech) list = list.filter(u=>u.tech===tech);
   list.sort(sortBySlotThenHo);
 
-  const title = `${config.siteName} 인터넷·TV 장비교체 작업지시서`;
+  const title = `${config.siteName} 인터넷·TV 장비교체 작업요청서`;
   if(!list.length){
     $('wsBody').innerHTML = `<div class="empty"><div class="ico">🧾</div><p>해당 조건의 작업이 없습니다</p></div>`;
     return;
   }
+  /* 개인정보는 ① 관리자·직원 계정이고 ② 체크박스를 켠 경우에만 인쇄합니다.
+     설치기사 계정은 애초에 contacts 자체를 내려받지 않으므로 켤 수도 없습니다. */
+  const wp = $('wsPersonal');
+  const showPersonal = canSeePersonal() && !!(wp && wp.checked);
+
+  const headCols = (arr) =>
+    `<div class="eq-h">${arr.map(e=>`<span class="eq-c">${EQUIP_SHORT[e.key]||e.label}</span>`).join('')}</div>`;
+  const boxCols = (arr) =>
+    `<div class="eq-h">${arr.map(()=>'<span class="eq-c eq-b">☐</span>').join('')}</div>`;
+
   const rows = list.map(u=>{
     const pinCell = isHotel(u.presence)
-      ? '<strong>🏨 11시 이후 개방 시 진입</strong>'
+      ? '<strong style="white-space:nowrap">🏨 11시 이후 개방시</strong>'
       : hasPin(u.presence)
         ? (u.pin ? `<strong>${esc(u.pin)}</strong>` : '<span style="color:#ef4444">비번 미입력</span>')
         : (PRESENCE[u.presence]||'—');
     return `<tr>
-      <td style="font-weight:800;font-size:17.2px">${esc(u.ho)}</td>
-      <td>${esc(slotLabel(date,u.slot)||'미정')}</td>
-      ${canSeePersonal() ? `<td>${esc(nameOf(u))}</td><td>${esc(phoneOf(u))}</td>` : ''}
+      <td class="nw" style="font-weight:800;font-size:1.15em">${esc(u.ho)}</td>
+      <td class="nw">${esc(slotLabel(date,u.slot)||'미정')}</td>
+      ${showPersonal ? `<td>${esc(nameOf(u))}</td><td>${esc(phoneOf(u))}</td>` : ''}
       <td>${pinCell}</td>
-      <td>${esc(u.tech||'')}</td>
-      <td style="letter-spacing:3px;white-space:nowrap">☐☐☐</td>
-      <td style="letter-spacing:3px;white-space:nowrap">☐☐</td>
-      <td style="min-width:70px"></td>
+      <td class="nw">${esc(u.tech||'')}</td>
+      <td>${boxCols(EQUIP_RET)}</td>
+      <td>${boxCols(EQUIP_INS)}</td>
+      <td><div class="eq-h"><span class="eq-c eq-b">☐</span></div></td>
     </tr>`;
   }).join('');
 
   $('wsBody').innerHTML = `
-    <div class="sec">
+    <div class="sec ws-sheet">
       <div class="sec-title" style="font-size:16.1px;color:var(--text)">${esc(title)} — ${fmtDate(date)}${tech&&tech!=='__none__'?' / '+esc(tech):''} (${list.length}세대)</div>
       <div style="overflow-x:auto">
         <table class="tbl">
           <thead><tr>
-            <th>호실</th><th>시간</th>${canSeePersonal()?'<th>성명</th><th>연락처</th>':''}<th>비번/재실</th><th>기사</th>
-            <th>회수<br><span style="font-weight:600">공유기·셋톱·리모컨</span></th>
-            <th>설치<br><span style="font-weight:600">공유기·셋톱</span></th>
+            <th class="nw">호실</th><th class="nw">시간</th>${showPersonal?'<th class="nw">성명</th><th class="nw">연락처</th>':''}<th>비번/재실</th><th class="nw">기사</th>
+            <th>회수${headCols(EQUIP_RET)}</th>
+            <th>설치${headCols(EQUIP_INS)}</th>
             <th>확인</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
       <div style="padding:9px 12px;font-size:13.2px;color:var(--muted);line-height:1.6">
-        ※ 비밀번호가 적힌 지시서는 <strong>작업 당일 사용 후 반드시 파쇄</strong>하십시오.
+        ※ 비밀번호가 적힌 작업요청서는 <strong>작업 당일 사용 후 반드시 파쇄</strong>하십시오.
+        ${showPersonal ? '<br><strong style="color:var(--red)">※ 이 인쇄물에는 입주민 성명·연락처가 포함되어 있습니다. 설치기사에게 전달하지 마십시오.</strong>' : ''}
       </div>
     </div>`;
 }
@@ -1670,6 +1720,451 @@ function renderStats(){
       <td class="num"><strong>${EQUIP_INS.reduce((s,e)=>s+units.filter(u=>u.ins[e.key]).length,0)}</strong></td>
       <td class="num"></td></tr></tbody>`;
 }
+
+/* ═══════════════════════════════════════════
+   사전회의용 계획문서
+   ───────────────────────────────────────────
+   설치팀에 미리 전달할 요약 문서를 새 창으로 만들어 인쇄합니다.
+   개인정보(성명·연락처)는 어떤 경우에도 넣지 않습니다.
+   ═══════════════════════════════════════════ */
+const MIN_PER_UNIT = 15;   // 세대당 작업시간(분) — 인력 산정 기준
+
+function hm2min(t){ const [h,m] = String(t||'0:0').split(':').map(Number); return (h||0)*60+(m||0); }
+function slotMinutes(s){ return Math.max(0, hm2min(s.to) - hm2min(s.from)); }
+function needTechs(s){
+  const dur = slotMinutes(s);
+  const cap = Number(s.cap)||0;
+  if(!dur || !cap) return 0;
+  return Math.ceil(cap * MIN_PER_UNIT / dur);
+}
+function hhmm(t){ return String(t||''); }
+
+function planDays(){
+  return (config.days||[]).filter(d=>d.date).slice().sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+function openPlanDoc(){
+  const days = planDays();
+  if(!days.length) return toast('설정 탭에서 작업일을 먼저 등록하세요', 3500);
+
+  const total = units.length;
+  const siteName = config.siteName || '현장';
+
+  /* ── 1. 세대 현황 ── */
+  const floorRows = floorsList().map(f=>{
+    const l = units.filter(u=>u.floor===f).sort((a,b)=>String(a.ho).localeCompare(String(b.ho),'en',{numeric:true}));
+    const h = l.filter(u=>isHotel(u.presence)).length;
+    return `<tr><td><b>${f}층</b></td><td class="n">${l.length}</td><td class="n">${h||'—'}</td>
+      <td class="n">${l.length?l[0].ho:''} ~ ${l.length?l[l.length-1].ho:''}</td></tr>`;
+  }).join('');
+  const hotelUnits = units.filter(u=>isHotel(u.presence)).map(u=>String(u.ho))
+                          .sort((a,b)=>a.localeCompare(b,'en',{numeric:true}));
+
+  /* ── 2. 일자별 시간대별 정원 ── */
+  let capTotal = 0, dayBlocks = '';
+  days.forEach(d=>{
+    const ss = slotsForDate(d.date);
+    let sub = 0, maxT = 0;
+    const rows = ss.map(s=>{
+      const cap = Number(s.cap)||0; sub += cap;
+      const nt = needTechs(s); if(nt>maxT) maxT = nt;
+      return `<tr><td>${hhmm(s.from)} ~ ${hhmm(s.to)}</td>
+        <td class="n">${slotMinutes(s)}분</td>
+        <td class="n"><b>${cap}</b></td>
+        <td class="n">${nt}명</td></tr>`;
+    }).join('');
+    capTotal += sub;
+    dayBlocks += `
+      <table class="t">
+        <thead><tr><th colspan="4" class="dh">${fmtDate(d.date)} · ${SLOT_KIND_LABEL[slotKindOf(d.date)]} — 하루 ${sub}세대</th></tr>
+          <tr><th>시간대</th><th>길이</th><th>정원(세대)</th><th>필요 인원</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td><b>합계</b></td><td class="n"></td><td class="n"><b>${sub}</b></td>
+          <td class="n"><b>최대 ${maxT}명 동시</b></td></tr></tfoot>
+      </table>`;
+  });
+
+  /* ── 3. 재실유형 ── */
+  const presRows = Object.entries(PRESENCE).map(([k,v])=>{
+    const n = units.filter(u=>(u.presence||'')===k).length;
+    if(!n) return '';
+    return `<tr><td>${v}</td><td class="n">${n}</td><td class="n">${total?Math.round(n/total*100):0}%</td>
+      <td>${PRES_WORK_NOTE[k]||''}</td></tr>`;
+  }).join('');
+
+  /* ── 4. 장비 물량 ── */
+  const eqRows = EQUIP_RET.map(e=>{
+    const ins = EQUIP_INS.some(x=>x.key===e.key);
+    return `<tr><td>${e.label}</td><td class="n">${total}</td><td class="n">${ins?total:'—'}</td></tr>`;
+  }).join('');
+
+  const doc = `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8">
+<title>${esc(siteName)} 인터넷·TV 장비교체 사전회의 자료</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif;color:#111;
+       font-size:14px;line-height:1.65;background:#f1f5f9;padding:18px}
+  .page{max-width:820px;margin:0 auto 18px;background:#fff;padding:34px 38px;
+        box-shadow:0 1px 6px rgba(0,0,0,.12);border-radius:6px}
+  h1{font-size:26px;font-weight:800;line-height:1.35}
+  h2{font-size:18px;font-weight:800;margin:26px 0 9px;padding:7px 11px;background:#0f766e;color:#fff;border-radius:4px}
+  h3{font-size:15.5px;font-weight:800;margin:16px 0 6px;color:#115e59}
+  p{margin:6px 0}
+  ul,ol{margin:6px 0 6px 21px}
+  li{margin:3px 0}
+  .cover{text-align:center;padding:60px 20px 50px;border-bottom:3px solid #0f766e}
+  .cover .sub{font-size:15px;color:#475569;margin-top:10px}
+  .meta{margin-top:26px;font-size:14px;color:#334155}
+  table.t{width:100%;border-collapse:collapse;margin:8px 0 14px;font-size:13.5px}
+  table.t th,table.t td{border:1px solid #94a3b8;padding:6px 8px;text-align:left}
+  table.t th{background:#f1f5f9;font-weight:800}
+  table.t th.dh{background:#0f766e;color:#fff;font-size:14.5px;text-align:center}
+  table.t tfoot td{background:#f8fafc;font-weight:800}
+  td.n,th.n{text-align:center}
+  .big{font-size:17px;font-weight:800;color:#0f766e}
+  .box{border:1.5px solid #cbd5e1;background:#f8fafc;border-radius:7px;padding:13px 15px;margin:9px 0}
+  .warn{border:1.5px solid #fcd34d;background:#fef3c7;color:#92400e;border-radius:7px;padding:13px 15px;margin:9px 0;font-weight:600}
+  .warn strong{font-weight:800}
+  .info{border:1.5px solid #93c5fd;background:#dbeafe;color:#1e40af;border-radius:7px;padding:13px 15px;margin:9px 0;font-weight:600}
+  .kv{display:flex;gap:10px;padding:5px 0;border-bottom:1px dashed #cbd5e1}
+  .kv b{min-width:150px;flex-shrink:0}
+  .chk{list-style:none;margin-left:0}
+  .chk li{padding-left:24px;position:relative}
+  .chk li:before{content:'☐';position:absolute;left:0;font-size:16px}
+  .hos{font-family:ui-monospace,monospace;font-size:13px;word-spacing:3px;line-height:1.9}
+  .bar{position:fixed;top:0;left:0;right:0;background:#0f766e;color:#fff;padding:9px 14px;
+       display:flex;gap:10px;align-items:center;justify-content:center;z-index:9;font-size:14px}
+  .bar button{padding:8px 18px;border:none;border-radius:7px;background:#fff;color:#0f766e;
+       font-weight:800;font-size:14px;cursor:pointer;font-family:inherit}
+  body{padding-top:56px}
+  /* ── 부록 C: 예약화면 예시 ── */
+  .ph{max-width:330px;margin:12px auto;border:9px solid #1e293b;border-radius:24px;overflow:hidden;background:#f1f5f9}
+  .ph-h{background:#0f766e;color:#fff;padding:15px 14px;text-align:center}
+  .ph-h .s{font-size:11px;opacity:.85;font-weight:600}
+  .ph-h h4{font-size:16px;font-weight:800;margin-top:4px;line-height:1.35}
+  .ph-c{background:#fff;margin:8px;border-radius:11px;border:1px solid #e2e8f0;overflow:hidden}
+  .ph-c .hd{padding:9px 12px;border-bottom:1px solid #e2e8f0;background:#f8fafc;font-size:11.5px;font-weight:800;color:#64748b}
+  .ph-c .bd{padding:12px;display:flex;flex-direction:column;gap:9px}
+  .ph-in{border:2px solid #e2e8f0;border-radius:8px;padding:9px 10px;font-size:13px;color:#1e293b;background:#fff}
+  .ph-in.f{border-color:#0f766e}
+  .ph-lb{font-size:11.5px;font-weight:700;color:#64748b;margin-bottom:3px}
+  .ph-pk{border:2px solid #e2e8f0;border-radius:9px;padding:10px;font-size:12.5px;font-weight:700}
+  .ph-pk.on{border-color:#0f766e;background:#ccfbf1}
+  .ph-pk .d{font-size:10.5px;font-weight:600;color:#64748b;margin-top:2px}
+  .ph-pk.on .d{color:#115e59}
+  .ph-bt{background:#0f766e;color:#fff;text-align:center;padding:11px;border-radius:9px;font-weight:800;font-size:13.5px}
+  .ph-nt{background:#fef3c7;border:1.5px solid #fcd34d;color:#92400e;padding:9px 11px;border-radius:8px;font-size:11.5px;font-weight:600;line-height:1.55}
+  .cap{text-align:center;font-size:12.5px;color:#475569;margin-top:6px}
+  @media print{
+    body{background:#fff;padding:0}
+    .bar{display:none}
+    .page{box-shadow:none;max-width:none;margin:0;padding:14mm 12mm;border-radius:0;page-break-after:always}
+    .page:last-child{page-break-after:auto}
+    table.t{page-break-inside:avoid}
+    h2{background:#0f766e!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    table.t th.dh{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .warn,.info,.box,.ph-h,.ph-pk.on,.ph-bt,.ph-nt{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style></head><body>
+<div class="bar">
+  <span>사전회의 자료 — 인쇄를 누르면 종이 또는 PDF로 저장됩니다</span>
+  <button onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>
+</div>
+
+<!-- ══ 표지 ══ -->
+<div class="page">
+  <div class="cover">
+    <div style="font-size:15px;color:#0f766e;font-weight:800">${esc(siteName)}</div>
+    <h1 style="margin-top:12px">인터넷 공유기 · IPTV 셋톱박스<br>일괄 교체작업 계획서</h1>
+    <div class="sub">설치팀 사전회의 자료</div>
+  </div>
+  <div class="meta">
+    <div class="kv"><b>현장</b><span>${esc(siteName)} 오피스텔</span></div>
+    <div class="kv"><b>대상 세대</b><span><b>${total}세대</b> (${floorsList()[0]}층 ~ ${floorsList()[floorsList().length-1]}층)</span></div>
+    <div class="kv"><b>작업 기간</b><span>${fmtDate(days[0].date)} ~ ${fmtDate(days[days.length-1].date)} · 총 ${days.length}일</span></div>
+    <div class="kv"><b>전 기간 정원</b><span>총 <b>${capTotal}세대</b> (${days.length}일 합계)</span></div>
+    <div class="kv"><b>회수 장비</b><span>${EQUIP_RET.map(e=>e.label).join(' · ')}</span></div>
+    <div class="kv"><b>설치 장비</b><span>${EQUIP_INS.map(e=>e.label).join(' · ')}</span></div>
+    <div class="kv"><b>예약 방식</b><span>입주민 온라인 자율예약 (관리사무소 병행 접수)</span></div>
+    <div class="kv"><b>작성일</b><span>${fmtDate(todayStr())}</span></div>
+    <div class="kv"><b>문의</b><span>관리사무소 032-710-5679</span></div>
+  </div>
+  ${capTotal < total ? `<div class="warn" style="margin-top:22px">
+    <strong>⚠ 정원 부족</strong><br>
+    현재 설정된 전 기간 정원 합계는 <strong>${capTotal}세대</strong>로, 대상 ${total}세대보다
+    <strong>${total-capTotal}세대 모자랍니다.</strong> 회의에서 시간대 정원 또는 작업일수를 조정해야 합니다.
+  </div>` : `<div class="info" style="margin-top:22px">
+    전 기간 정원 합계 <strong>${capTotal}세대</strong>로 대상 ${total}세대를 모두 수용할 수 있습니다.
+    (여유 ${capTotal-total}세대 · 부재·재방문 대비분)
+  </div>`}
+</div>
+
+<!-- ══ 1. 세대 현황 ══ -->
+<div class="page">
+  <h2>1. 세대 현황</h2>
+  <table class="t">
+    <thead><tr><th>층</th><th class="n">세대수</th><th class="n">호텔 운영</th><th class="n">호실 범위</th></tr></thead>
+    <tbody>${floorRows}</tbody>
+    <tfoot><tr><td><b>합계</b></td><td class="n"><b>${total}</b></td>
+      <td class="n"><b>${hotelUnits.length}</b></td><td></td></tr></tfoot>
+  </table>
+  <p>호실 번호체계는 <b>연속</b>이며, 결번은 없습니다.</p>
+
+  <h2>2. 재실 유형별 현황 및 진입 방법</h2>
+  <table class="t">
+    <thead><tr><th>재실 유형</th><th class="n">세대</th><th class="n">비율</th><th>작업 시 진입 방법</th></tr></thead>
+    <tbody>${presRows}</tbody>
+  </table>
+  <div class="warn">
+    <strong>예약 접수가 진행되면서 위 분포는 계속 바뀝니다.</strong>
+    본 문서는 ${fmtDate(todayStr())} 기준이며, 작업 전일에 최종본을 다시 전달합니다.
+  </div>
+
+  ${hotelUnits.length ? `
+  <h3>호텔 운영 세대 (${hotelUnits.length}세대) — 별도 협의 대상</h3>
+  <div class="box">
+    <div class="hos">${hotelUnits.map(h=>esc(h)).join(' · ')}</div>
+  </div>
+  <ul>
+    <li>객실 <b>체크아웃이 오전 11시</b>이므로, <b>11시 이전 시간대에는 배정하지 않습니다.</b></li>
+    <li>퇴실 후 청소 중에는 문이 열려 있습니다. <b>문이 열려 있으면 그대로 진입해 작업</b>하시면 됩니다.</li>
+    <li>문이 잠겨 있으면 무리하게 대기하지 마시고 <b>부재·재방문으로 표시</b> 후 다음 시간대로 넘겨주십시오.</li>
+    <li>이 세대들은 <b>입주민 온라인 예약에서 제외</b>되어 있으며, 관리사무소가 호텔 운영사와 직접 일정을 조율합니다.</li>
+  </ul>` : ''}
+</div>
+
+<!-- ══ 3. 일자별 정원 ══ -->
+<div class="page">
+  <h2>3. 일자별 · 시간대별 교체 정원</h2>
+  <p>정원은 해당 시간대에 <b>예약을 받을 수 있는 최대 세대수</b>입니다.
+     필요 인원은 <b>세대당 ${MIN_PER_UNIT}분</b> 기준으로 산출한 <b>동시 투입 기사 수</b>입니다.</p>
+  ${dayBlocks}
+  <div class="box">
+    <div class="big">전 기간 정원 합계 ${capTotal}세대 / 대상 ${total}세대</div>
+    <p style="margin-top:6px">
+      산출 기준 — 세대당 ${MIN_PER_UNIT}분 (이동·확인 포함).
+      실제로는 부재로 인한 재방문이 발생하므로 <b>정원의 10~15% 정도 여유</b>를 두는 것이 안전합니다.
+    </p>
+  </div>
+  <h3>협의가 필요한 사항</h3>
+  <ul class="chk">
+    <li>시간대별 정원과 투입 인원이 맞는지 확인 (특히 야간 시간대)</li>
+    <li>기사 1인당 담당 층 구분 방식 — 층별 배정 / 시간대별 배정</li>
+    <li>회수 장비 임시 보관 장소 및 반출 일정</li>
+    <li>신규 장비 반입 일정과 층별 사전 배치 여부</li>
+    <li>공용 엘리베이터 사용 시간 및 보양 계획</li>
+    <li>부재 세대 재방문 처리 방식 (당일 마감 후 / 다음 날)</li>
+    <li>작업 중 사고·파손 발생 시 연락 체계</li>
+    <li>기사 신분 확인 방법 (명찰·복장) — 입주민 안내에 필요</li>
+  </ul>
+</div>
+
+<!-- ══ 4. 장비 물량 ══ -->
+<div class="page">
+  <h2>4. 장비 물량</h2>
+  <table class="t">
+    <thead><tr><th>장비</th><th class="n">회수 예정</th><th class="n">설치 예정</th></tr></thead>
+    <tbody>${eqRows}</tbody>
+  </table>
+  <p>전 세대 교체 기준 수량입니다. 공실·거부 세대가 확정되면 최종본에서 조정됩니다.</p>
+
+  <h2>5. 작업 진행 방식</h2>
+  <ol>
+    <li>입주민이 <b>온라인 예약 페이지</b>에서 호실 + 연락처 뒷 4자리로 본인 확인 후 시간대를 직접 선택합니다.</li>
+    <li>관리사무소가 <b>미예약 세대</b>를 추려 유선·문자로 개별 접수합니다.</li>
+    <li>작업 전일, 사무소가 <b>일자별 작업요청서</b>를 출력해 기사별로 전달합니다.
+        (개인정보 보호를 위해 <b>성명·연락처는 인쇄되지 않습니다</b>)</li>
+    <li>기사는 작업요청서의 호실 순서대로 방문하고, 회수·설치 항목에 체크합니다.</li>
+    <li>사무소는 실시간 관리앱에서 진행 상황을 확인하고, 부재 세대를 즉시 재배정합니다.</li>
+  </ol>
+  <div class="warn">
+    <strong>개인정보 관련 협조 요청</strong><br>
+    설치기사에게 전달되는 작업요청서에는 <strong>입주민 성명과 연락처가 표기되지 않습니다.</strong>
+    부재 세대의 <strong>현관 임시 비밀번호</strong>는 작업요청서에 표기되므로,
+    <strong>작업 당일 사용 후 반드시 파쇄</strong>해 주시고 촬영·복사·전송을 금합니다.
+  </div>
+</div>
+
+<!-- ══ 부록 A ══ -->
+<div class="page">
+  <h2>부록 A. 입주민 예약페이지 안내 문구 (전문)</h2>
+  <p>입주민이 예약 페이지에서 가장 먼저 보게 되는 내용입니다. 설치팀도 같은 내용을 숙지해 주십시오.</p>
+
+  <h3>꼭 읽어주세요</h3>
+  ${PLAN_NOTICE_HTML}
+
+  <h3>임시 비밀번호 안내</h3>
+  <div class="info">
+    <strong>부득이하게 자리를 비우셔야 한다면</strong><br>
+    현관 도어락에 <strong>임시 비밀번호</strong>를 만들어 두시고, 예약 시 그 번호를 남겨주세요.
+    작업이 끝나면 저장된 번호는 <strong>바로 삭제</strong>되며, 작업 후 <strong>반드시 임시 비밀번호를 지워주시기 바랍니다.</strong>
+  </div>
+
+  <h3>예약 변경·취소 안내</h3>
+  <div class="box">
+    예약 취소·변경은 <b>예약 당일 아침 7시까지</b> 가능하며, 이후에는 온라인에서 불가합니다.
+    그 이후 변경이 필요한 세대는 관리사무소로 연락하도록 안내하고 있습니다.
+  </div>
+</div>
+
+<!-- ══ 부록 B ══ -->
+<div class="page">
+  <h2>부록 B. 작업요청서 샘플</h2>
+  <p>기사에게 전달되는 실제 양식입니다. <b>성명·연락처 열이 없습니다.</b></p>
+  ${planSampleWorksheet(days[0].date)}
+  <ul>
+    <li><b>비번/재실</b> — 부재 세대의 현관 임시 비밀번호 또는 재실 유형이 표시됩니다.</li>
+    <li><b>회수 / 설치</b> — 장비별로 체크한 뒤, 사무소에서 앱에 입력해 집계합니다.</li>
+    <li><b>확인</b> — 세대 작업 완료 확인란입니다.</li>
+    <li>비밀번호가 인쇄된 용지는 <b>당일 사용 후 파쇄</b>합니다.</li>
+  </ul>
+</div>
+
+<!-- ══ 부록 C ══ -->
+<div class="page">
+  <h2>부록 C. 입주민 예약화면 예시 (부재 · 임시 비밀번호 사용)</h2>
+  <p>입주민이 <b>집을 비우고 임시 비밀번호를 남기는</b> 경우의 실제 화면 흐름입니다.</p>
+
+  <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center">
+    <div style="flex:1;min-width:280px">
+      <div class="ph">
+        <div class="ph-h"><div class="s">${esc(siteName)}</div><h4>인터넷·TV 장비교체<br>방문 예약</h4></div>
+        <div class="ph-c">
+          <div class="hd">1 · 본인 확인</div>
+          <div class="bd">
+            <div><div class="ph-lb">호실 번호</div><div class="ph-in f">512</div></div>
+            <div><div class="ph-lb">연락처 뒷 4자리</div><div class="ph-in f">1234</div></div>
+            <div class="ph-bt">확인</div>
+          </div>
+        </div>
+        <div class="ph-c">
+          <div class="hd">2 · 작업 시 재실 방법</div>
+          <div class="bd">
+            <div class="ph-pk">직접 집에 있겠습니다<div class="d">예약한 시간에 세대에서 기사를 맞이합니다</div></div>
+            <div class="ph-pk on">임시 비밀번호를 남기겠습니다<div class="d">부재 중이라도 기사가 들어가 작업할 수 있습니다</div></div>
+            <div><div class="ph-lb">현관 임시 비밀번호</div><div class="ph-in f">1234*</div></div>
+            <div class="ph-nt">평소 쓰시던 비밀번호가 아닌 <b>임시 번호</b>를 만들어 알려주세요.
+              작업 완료 후 저장된 번호는 삭제되며, <b>입주민께서도 임시 번호를 꼭 지워주세요.</b></div>
+          </div>
+        </div>
+      </div>
+      <div class="cap">① 본인 확인 → ② 부재 · 임시 비밀번호 입력</div>
+    </div>
+
+    <div style="flex:1;min-width:280px">
+      <div class="ph">
+        <div class="ph-c" style="margin-top:8px">
+          <div class="hd">4 · 시간 선택</div>
+          <div class="bd">
+            ${(slotsForDate(days[0].date)||[]).slice(0,5).map((s,i)=>`
+              <div class="ph-pk ${i===2?'on':''}" style="display:flex;justify-content:space-between;align-items:center">
+                <span>${planFmtTime(s.from)} ~ ${planFmtTime(s.to)}</span>
+                <span style="font-size:10.5px;color:${i===1?'#ef4444':'#16a34a'}">${i===1?'마감':'예약 가능'}</span>
+              </div>`).join('')}
+          </div>
+        </div>
+        <div class="ph-c">
+          <div class="hd">5 · 확인 후 신청</div>
+          <div class="bd">
+            <div style="background:#dbeafe;border:1.5px solid #93c5fd;color:#1e40af;padding:10px;border-radius:8px;font-size:12.5px;font-weight:700">
+              <div style="font-size:14px">512호</div>
+              <div style="font-size:14px">${fmtDate(days[0].date)} ${planFmtTime((slotsForDate(days[0].date)[2]||{}).from)} ~ ${planFmtTime((slotsForDate(days[0].date)[2]||{}).to)}</div>
+              <div style="margin-top:5px;font-weight:600">임시 비밀번호를 남기고 부재</div>
+            </div>
+            <div class="ph-bt">이 시간으로 예약 신청</div>
+          </div>
+        </div>
+      </div>
+      <div class="cap">③ 시간 선택 → ④ 신청 완료</div>
+    </div>
+  </div>
+
+  <div class="warn" style="margin-top:16px">
+    <strong>설치팀 확인사항</strong> — 위 화면에서 입주민이 입력한 임시 비밀번호가
+    그대로 <b>작업요청서의 「비번/재실」 칸</b>에 인쇄됩니다.
+    작업 완료 처리를 하면 저장된 비밀번호는 <b>자동으로 삭제</b>됩니다.
+  </div>
+</div>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  if(!w){
+    toast('팝업이 차단되었습니다. 주소창의 팝업 허용을 눌러주세요.', 5000);
+    return;
+  }
+  w.document.open();
+  w.document.write(doc);
+  w.document.close();
+}
+
+/* 재실유형별 진입 방법 설명 — 계획문서용 */
+const PRES_WORK_NOTE = {
+  '':          '예약 접수 중 · 확정 전',
+  present:     '입주민이 직접 문을 열어드립니다',
+  absentPin:   '입주민이 남긴 현관 임시 비밀번호로 진입',
+  vacantPin:   '공실 · 관리사무소 비밀번호로 진입 (사무소 직원 동행)',
+  hotel:       '11시 체크아웃 후 청소 중 개방 상태일 때 진입',
+};
+
+function planFmtTime(t){
+  if(!t) return '';
+  const [h,m] = String(t).split(':').map(Number);
+  const ap = h<12 ? '오전' : '오후';
+  const hh = h===0?12 : (h>12?h-12:h);
+  return `${ap} ${hh}시${m?' '+m+'분':''}`;
+}
+
+/* 부록 B — 개인정보가 없는 작업요청서 샘플표 */
+function planSampleWorksheet(date){
+  const ss = slotsForDate(date);
+  const sample = [
+    { ho:'201', si:0, pin:'재실',         tech:'김○○' },
+    { ho:'204', si:0, pin:'8241*',        tech:'김○○' },
+    { ho:'207', si:0, pin:'공실 (사무소)', tech:'김○○' },
+    { ho:'305', si:1, pin:'재실',         tech:'이○○' },
+    { ho:'603', si:2, pin:'🏨 11시 이후 개방 시 진입', tech:'이○○' },
+  ];
+  const head = (arr)=>`<div style="display:flex;justify-content:center;gap:6px;margin-top:3px;white-space:nowrap">
+      ${arr.map(e=>`<span style="display:inline-block;min-width:3.4em;text-align:center;font-weight:700">${EQUIP_SHORT[e.key]||e.label}</span>`).join('')}</div>`;
+  const boxes = (arr)=>`<div style="display:flex;justify-content:center;gap:6px;white-space:nowrap">
+      ${arr.map(()=>'<span style="display:inline-block;min-width:3.4em;text-align:center;font-size:1.15em">☐</span>').join('')}</div>`;
+  const rows = sample.map(r=>{
+    const s = ss[r.si] || {};
+    return `<tr>
+      <td style="font-weight:800;white-space:nowrap">${r.ho}</td>
+      <td class="n" style="white-space:nowrap">${hhmm(s.from)}~${hhmm(s.to)}</td>
+      <td class="n">${esc(r.pin)}</td>
+      <td class="n" style="white-space:nowrap">${r.tech}</td>
+      <td>${boxes(EQUIP_RET)}</td>
+      <td>${boxes(EQUIP_INS)}</td>
+      <td>${boxes([{key:'x',label:''}])}</td>
+    </tr>`;
+  }).join('');
+  return `<table class="t">
+    <thead><tr><th colspan="7" class="dh">${esc(config.siteName)} 인터넷·TV 장비교체 작업요청서 — ${fmtDate(date)} (예시)</th></tr>
+      <tr><th style="white-space:nowrap">호실</th><th class="n" style="white-space:nowrap">시간</th><th class="n">비번/재실</th><th class="n" style="white-space:nowrap">기사</th>
+        <th class="n">회수${head(EQUIP_RET)}</th><th class="n">설치${head(EQUIP_INS)}</th><th class="n">확인</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <p style="font-size:12.5px;color:#64748b">※ 비밀번호가 적힌 작업요청서는 작업 당일 사용 후 반드시 파쇄하십시오.</p>`;
+}
+
+/* 예약페이지 「꼭 읽어주세요」 문구 — book.html 과 같은 내용을 유지하세요 */
+const PLAN_NOTICE_HTML = `
+  <div class="warn">
+    <strong>예약하신 시간대에 반드시 세대 내에 계셔야 합니다.</strong>
+    <div style="margin-top:8px;padding:9px 11px;background:#fff7d6;border:1.5px dashed #d97706;border-radius:6px">
+      <strong>신발장 안의 하얀색 통신단자함을 열어야 하니, 그 부분의 신발을 미리 치워두시면 작업시간이 절약됩니다.</strong>
+    </div>
+    <ul>
+      <li>작업 시간은 세대당 <strong>10~15분</strong> 소요됩니다.</li>
+      <li>기존 <strong>인터넷 공유기·셋톱박스를 회수</strong>하고 새 장비로 교체합니다.
+          기존 장비와 <strong>리모컨·전원 어댑터</strong>를 미리 챙겨두시면 빠릅니다.</li>
+      <li>부재 시 작업이 불가하며, 재방문 일정을 다시 잡으셔야 합니다.</li>
+      <li><strong>기간 내에 장비 교체가 안되면 인터넷 사용이 며칠 또는 일주일 이상 늦어질 수 있습니다.</strong></li>
+      <li>부재중 작업시 관리실 직원이 순찰하고 있으나, 만약을 대비해 <strong>귀중품은 보이지 않는 곳에 잘 보관</strong>해 두시기 바랍니다.</li>
+    </ul>
+  </div>`;
 
 /* ═══════════════════════════════════════════
    CSV

@@ -45,6 +45,9 @@ textarea{resize:vertical;min-height:74px;font-size:16px}
 .notice strong{font-weight:800}
 .notice ul{margin:7px 0 0 18px}
 .notice li{margin-bottom:5px}
+.notice .hilite{margin:9px 0 2px;padding:11px 12px;background:#fff7d6;border:2px dashed #d97706;border-radius:9px;font-size:16.5px;font-weight:800;line-height:1.55;color:#7c2d12}
+.tiny{font-size:13.5px;color:var(--muted);line-height:1.6;text-align:center;font-weight:600}
+.locked{background:#f1f5f9;border:1.5px solid var(--border);color:#475569;padding:13px 15px;border-radius:11px;font-size:15px;font-weight:700;white-space:pre-line}
 .info{background:var(--blue-bg);border:1.5px solid var(--blue-br);color:var(--blue-tx);padding:13px 15px;border-radius:11px;font-size:15px;font-weight:600}
 .err{background:var(--red-bg);border:1.5px solid #fca5a5;color:#991b1b;padding:13px 15px;border-radius:11px;font-size:15px;font-weight:700;white-space:pre-line}
 .ok-box{background:var(--green-bg);border:1.5px solid #86efac;color:#166534;padding:16px;border-radius:12px;text-align:center}
@@ -95,7 +98,7 @@ footer{text-align:center;padding:20px 18px;color:var(--muted);font-size:13.5px;l
     <div class="step-body">
       <div class="notice center" style="font-size:17px">
         현재 <strong>온라인 예약 접수가 마감</strong>되었습니다.<br>
-        관리사무소로 문의해 주세요.
+        관리사무소(032-710-5679)로 문의해 주세요.
       </div>
     </div>
   </div>
@@ -107,11 +110,16 @@ footer{text-align:center;padding:20px 18px;color:var(--muted);font-size:13.5px;l
       <div class="step-head"><span class="n">!</span>꼭 읽어주세요</div>
       <div class="step-body">
         <div class="notice">
-          <strong>예약하신 시간에 반드시 세대 내에 계셔야 합니다.</strong>
+          <strong>예약하신 시간대에 반드시 세대 내에 계셔야 합니다.</strong>
+          <div class="hilite">
+            신발장 안의 <strong>하얀색 통신단자함</strong>을 열어야 하니, 그 부분의 <strong>신발을 미리 치워두시면 작업시간이 절약</strong>됩니다.
+          </div>
           <ul>
-            <li>작업 시간은 세대당 약 <strong>20~30분</strong> 소요됩니다.</li>
+            <li>작업 시간은 세대당 <strong>10~15분</strong> 소요됩니다.</li>
             <li>기존 <strong>인터넷 공유기·셋톱박스를 회수</strong>하고 새 장비로 교체합니다. 기존 장비와 <strong>리모컨·전원 어댑터</strong>를 미리 챙겨두시면 빠릅니다.</li>
             <li>부재 시 작업이 불가하며, 재방문 일정을 다시 잡으셔야 합니다.</li>
+            <li><strong>기간 내에 장비 교체가 안되면 인터넷 사용이 며칠 또는 일주일 이상 늦어질 수 있습니다.</strong></li>
+            <li>부재중 작업시 관리실 직원이 순찰하고 있으나, 만약을 대비해 <strong>귀중품은 보이지 않는 곳에 잘 보관</strong>해 두시기 바랍니다.</li>
           </ul>
         </div>
         <div class="info">
@@ -175,9 +183,11 @@ footer{text-align:center;padding:20px 18px;color:var(--muted);font-size:13.5px;l
           <div id="curHo" style="font-weight:700"></div>
           <div style="margin-top:9px;font-size:15px" id="curMode"></div>
         </div>
-        <div class="notice">예약하신 시간에 <strong>반드시 세대에 계셔야</strong> 작업이 가능합니다.</div>
-        <button class="btn btn-primary" onclick="changeBooking()">예약 시간 변경하기</button>
-        <button class="btn btn-outline" onclick="cancelBooking()" style="color:#b91c1c">예약 취소하기</button>
+        <div class="notice">예약하신 시간대에 <strong>반드시 세대에 계셔야</strong> 작업이 가능합니다.</div>
+        <div id="curLocked" class="locked hide"></div>
+        <button class="btn btn-primary" id="btnChange" onclick="changeBooking()">예약 시간 변경하기</button>
+        <button class="btn btn-outline" id="btnCancel" onclick="cancelBooking()" style="color:#b91c1c">예약 취소하기</button>
+        <div class="tiny" id="curCutoff"></div>
       </div>
     </div>
 
@@ -221,15 +231,18 @@ footer{text-align:center;padding:20px 18px;color:var(--muted);font-size:13.5px;l
           <div id="doneHo" style="font-weight:700"></div>
           <div style="margin-top:9px;font-size:15px" id="doneMode"></div>
         </div>
-        <div class="notice">예약하신 시간에 <strong>반드시 세대에 계셔야</strong> 작업이 가능합니다. 시간 변경이 필요하시면 아래 버튼을 눌러 다시 선택해 주세요.</div>
+        <div class="notice">예약하신 시간대에 <strong>반드시 세대에 계셔야</strong> 작업이 가능합니다. 시간 변경이 필요하시면 아래 버튼을 눌러 다시 선택해 주세요.</div>
         <button class="btn btn-outline" onclick="restart()">예약 시간 변경하기</button>
+        <button class="btn btn-outline" onclick="cancelBooking()" style="color:#b91c1c">예약 취소하기</button>
+        <div class="tiny">예약 취소·변경은 예약 당일 아침 7시까지이며,<br>이후에는 불가합니다.</div>
       </div>
     </div>
 
   </div>
 
   <footer>
-    문의 · 관리사무소<br>
+    <strong style="font-size:16px;color:var(--text)">문의 · 관리사무소 <a href="tel:0327105679" style="color:var(--primary)">032-710-5679</a></strong><br>
+    예약 취소·변경은 예약 당일 아침 7시까지이며, 이후에는 불가합니다.<br>
     입력하신 정보는 장비교체 작업에만 사용되며, 작업 종료 후 폐기됩니다.
   </footer>
 </div>
@@ -247,10 +260,33 @@ let sel = { ho:'', ph4:'', mode:'', pin:'', date:'', slot:'' };
 let myBooking = null;  // 이미 넣은 예약 (있으면 확인·변경·취소 가능)
 
 const slotKey = (date, slot) => `${date}__${slot}`;
-// 오늘 이전 날짜는 예약 대상에서 제외
-function todayStr(){
-  const d=new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+/* ── 시각 기준: 언제나 서울(KST) ──
+   해외 체류나 기기 시간대 설정과 무관하게 같은 결과가 나오도록
+   Intl 로 서울 시각을 직접 계산합니다. */
+const KST = 'Asia/Seoul';
+function seoulParts(){
+  const f = new Intl.DateTimeFormat('en-CA', {
+    timeZone: KST, year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', hour12:false,
+  }).formatToParts(new Date());
+  const g = {};
+  f.forEach(p=>{ g[p.type] = p.value; });
+  const hour = g.hour === '24' ? '00' : g.hour;   // 일부 환경에서 자정을 24로 줍니다
+  return { date:`${g.year}-${g.month}-${g.day}`, hour:Number(hour), minute:Number(g.minute) };
+}
+// 오늘(서울 기준) 이전 날짜는 예약 대상에서 제외
+function todayStr(){ return seoulParts().date; }
+
+/* 예약 변경·취소 마감 — 예약 당일 아침 7시 (서울 기준) */
+const CUTOFF_HOUR = 7;
+const CUTOFF_TEXT = '예약 취소·변경은 예약 당일 아침 7시까지이며, 이후에는 불가합니다.';
+function isLocked(date){
+  if(!date) return false;
+  const now = seoulParts();
+  if(now.date < date) return false;          // 예약일 전날까지는 자유
+  if(now.date > date) return true;           // 예약일이 지났으면 잠금
+  return now.hour >= CUTOFF_HOUR;            // 당일 07:00 부터 잠금
 }
 async function loadAvail(){
   const { collection, getDocs } = fbm;
@@ -297,7 +333,7 @@ async function boot(){
     try{ cfg = JSON.parse(localStorage.getItem('ittv_fbconfig')||'null'); }catch(e){ cfg = null; }
   }
   if(!cfg || !cfg.apiKey){
-    $('loading').innerHTML = '예약 시스템이 아직 준비되지 않았습니다.<br>관리사무소로 문의해 주세요.';
+    $('loading').innerHTML = '예약 시스템이 아직 준비되지 않았습니다.<br>관리사무소(032-710-5679)로 문의해 주세요.';
     return;
   }
   try{
@@ -334,7 +370,7 @@ async function boot(){
     $('loading').classList.add('hide');
     if(!pub){
       $('loading').classList.remove('hide');
-      $('loading').innerHTML = '예약 정보가 아직 등록되지 않았습니다.<br>관리사무소로 문의해 주세요.';
+      $('loading').innerHTML = '예약 정보가 아직 등록되지 않았습니다.<br>관리사무소(032-710-5679)로 문의해 주세요.';
       return;
     }
     if(pub.siteName) $('hSite').textContent = pub.siteName;
@@ -342,7 +378,7 @@ async function boot(){
     $('mainFlow').classList.remove('hide');
   }catch(e){
     console.error(e);
-    $('loading').innerHTML = '연결에 실패했습니다.<br>잠시 후 다시 시도하거나 관리사무소로 문의해 주세요.<br><span style="font-size:12px">('+esc(e.message)+')</span>';
+    $('loading').innerHTML = '연결에 실패했습니다.<br>잠시 후 다시 시도하거나 관리사무소(032-710-5679)로 문의해 주세요.<br><span style="font-size:12px">('+esc(e.message)+')</span>';
   }
 }
 
@@ -359,14 +395,14 @@ async function doVerify(){
 
   // 호텔 운영 호실은 관리사무소가 직접 일정을 조율합니다
   if((pub.hotelHos||[]).includes(ho)){
-    return fail(`${ho}호는 온라인 예약 대상이 아닙니다.\n관리사무소에서 일정을 직접 조율해 드립니다.\n문의: 관리사무소`);
+    return fail(`${ho}호는 온라인 예약 대상이 아닙니다.\n관리사무소에서 일정을 직접 조율해 드립니다.\n문의: 관리사무소 032-710-5679`);
   }
 
   const expect = roster[ho];
   if(expect){
     if(ph4.length !== 4) return fail('연락처 뒷 4자리를 입력해 주세요.');
     const got = await sha256hex(`${SITE_ID}:${ho}:${ph4}`);
-    if(got !== expect) return fail('호실과 연락처가 일치하지 않습니다.\n관리사무소로 문의해 주세요.');
+    if(got !== expect) return fail('호실과 연락처가 일치하지 않습니다.\n관리사무소(032-710-5679)로 문의해 주세요.');
   }
   // 연락처 미등록 세대는 뒷4자리 확인 없이 통과 (입력값은 그대로 저장해 대조에 씁니다)
 
@@ -395,14 +431,29 @@ function showMyBooking(){
                  : fmtDate(myBooking.date);
   $('curWhen').textContent = when;
   $('curHo').textContent = `${myBooking.ho}호`;
-  $('curMode').textContent = myBooking.presence==='pin'
+  $('curMode').textContent = (myBooking.presence==='pin' || myBooking.presence==='absentPin')
     ? '임시 비밀번호를 남기신 것으로 접수되었습니다.'
-    : '예약 시간에 세대에 계셔야 작업이 가능합니다.';
+    : '예약 시간대에 세대에 계셔야 작업이 가능합니다.';
+
+  /* 예약 당일 아침 7시가 지나면 온라인 변경·취소를 막습니다 */
+  const locked = isLocked(myBooking.date);
+  $('btnChange').classList.toggle('hide', locked);
+  $('btnCancel').classList.toggle('hide', locked);
+  $('curLocked').classList.toggle('hide', !locked);
+  if(locked){
+    $('curLocked').textContent =
+      '예약 당일 아침 7시가 지나 온라인 변경·취소가 마감되었습니다.\n부득이한 사정이 있으시면 관리사무소(032-710-5679)로 연락해 주세요.';
+    $('curCutoff').textContent = '';
+  }else{
+    $('curCutoff').innerHTML = '예약 취소·변경은 예약 당일 아침 7시까지이며,<br>이후에는 불가합니다.';
+  }
+
   ['stepMode','stepDay','stepSlot','stepSubmit','stepDone'].forEach(x=>$(x).classList.add('hide'));
   $('stepCurrent').classList.remove('hide');
   window.scrollTo({top:0, behavior:'smooth'});
 }
 function changeBooking(){
+  if(myBooking && isLocked(myBooking.date)){ showMyBooking(); return; }
   $('stepCurrent').classList.add('hide');
   $('stepMode').classList.remove('hide');
   // 기존 선택을 기본값으로
@@ -424,10 +475,11 @@ function pickMode(btn){
 
 /* ── 3. 날짜 ── */
 function renderDays(){
-  const t = todayStr();
-  const days = (pub.days||[]).map(d=>d.date).filter(d=>d && d>=t).sort();   // 지난 날짜는 제외
+  /* 지난 날짜와, 아침 7시가 지난 당일은 제외합니다.
+     당일 작업요청서가 이미 기사에게 나간 뒤라 온라인으로 끼워넣을 수 없습니다. */
+  const days = (pub.days||[]).map(d=>d.date).filter(d=>d && !isLocked(d)).sort();
   if(!days.length){
-    $('dayPick').innerHTML = '<div class="muted">예약 가능한 날짜가 남아 있지 않습니다. 관리사무소로 문의해 주세요.</div>';
+    $('dayPick').innerHTML = '<div class="muted">예약 가능한 날짜가 남아 있지 않습니다. 관리사무소(032-710-5679)로 문의해 주세요.</div>';
     return;
   }
   $('dayPick').innerHTML = days.map(d=>`
@@ -477,6 +529,14 @@ async function doSubmit(){
   const err = $('sErr'); err.classList.add('hide');
   const fail = m => { err.textContent = m; err.classList.remove('hide'); };
   if(!sel.date || !sel.slot) return fail('날짜와 시간을 선택해 주세요.');
+  // 마감 시각을 서버로 보내기 전에 한 번 더 확인합니다 (화면을 오래 열어둔 경우 대비)
+  if(isLocked(sel.date)){
+    renderDays();
+    return fail('선택하신 날짜는 아침 7시가 지나 접수가 마감되었습니다.\n다른 날짜를 선택하시거나 관리사무소(032-710-5679)로 연락해 주세요.');
+  }
+  if(myBooking && !myBooking.cancelled && isLocked(myBooking.date)){
+    return fail('예약 당일 아침 7시가 지나 변경이 마감되었습니다.\n관리사무소(032-710-5679)로 연락해 주세요.');
+  }
   if(sel.mode==='pin'){
     const pin = $('inPin').value.trim();
     if(!pin) return fail('임시 비밀번호를 입력하시거나, 직접 재실하시는 것으로 변경해 주세요.');
@@ -542,7 +602,7 @@ async function doSubmit(){
     $('doneHo').textContent = `${sel.ho}호`;
     $('doneMode').textContent = sel.mode==='pin'
       ? '임시 비밀번호를 남기신 것으로 접수되었습니다.\n작업 후 반드시 임시 번호를 삭제해 주세요.'
-      : '예약 시간에 세대에 계셔야 작업이 가능합니다.';
+      : '예약 시간대에 세대에 계셔야 작업이 가능합니다.';
     $('doneMode').style.whiteSpace = 'pre-line';
 
     ['stepMode','stepDay','stepSlot','stepSubmit'].forEach(x=>$(x).classList.add('hide'));
@@ -558,6 +618,11 @@ async function doSubmit(){
 /* ── 예약 취소 ── */
 async function cancelBooking(){
   if(!myBooking || myBooking.cancelled) return;
+  if(isLocked(myBooking.date)){
+    alert('예약 당일 아침 7시가 지나 온라인 취소가 마감되었습니다.\n관리사무소(032-710-5679)로 연락해 주세요.');
+    showMyBooking();
+    return;
+  }
   if(!confirm('예약을 취소하시겠습니까?\n취소 후 다시 예약하실 수 있습니다.')) return;
   try{
     await fbm.runTransaction(db, async tx => {
@@ -575,7 +640,7 @@ async function cancelBooking(){
     alert('예약이 취소되었습니다.');
     restart();
   }catch(e){
-    alert('취소에 실패했습니다. 잠시 후 다시 시도하거나 관리사무소로 문의해 주세요.');
+    alert('취소에 실패했습니다. 잠시 후 다시 시도하거나 관리사무소(032-710-5679)로 문의해 주세요.');
   }
 }
 
