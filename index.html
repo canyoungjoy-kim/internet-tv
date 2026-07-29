@@ -270,6 +270,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
               <option value="present">재실</option>
               <option value="absentPin">부재(비번)</option>
               <option value="vacantPin">공실(비번)</option>
+              <option value="hotel">호텔 (11시 이후 시간대만)</option>
             </select>
           </div>
           <button class="btn btn-primary btn-full" onclick="bulkAssign()">해당 층 일괄 배정</button>
@@ -343,6 +344,21 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
           <button class="btn btn-outline btn-full" onclick="exportEquipCsv()">⬇ 장비 회수대장 CSV (정산용)</button>
           <button class="btn btn-outline btn-full" onclick="exportUnbookedCsv()">⬇ 미예약 세대 CSV (독촉 문자용)</button>
           <button class="btn btn-outline btn-full" onclick="copyUnbookedPhones()">📋 미예약 세대 연락처만 복사</button>
+          <div class="fg">
+            <label>재실유형 일괄 지정 (호실 번호를 쉼표나 줄바꿈으로 구분)</label>
+            <textarea id="bulkPresHos" placeholder="예) 201, 305, 412&#10;806&#10;1004"></textarea>
+            <div style="display:flex;gap:7px">
+              <select id="bulkPresVal" style="flex:1">
+                <option value="hotel">호텔</option>
+                <option value="present">재실</option>
+                <option value="absentPin">부재(비번)</option>
+                <option value="vacantPin">공실(비번)</option>
+                <option value="">미확정</option>
+              </select>
+              <button class="btn btn-primary btn-sm" style="flex-shrink:0" onclick="bulkSetPresence()">적용</button>
+            </div>
+          </div>
+          <div class="help">호텔 운영 호실처럼 여러 세대를 한꺼번에 지정할 때 쓰세요. 호실 목록을 붙여넣고 유형을 고른 뒤 적용을 누르면 됩니다.</div>
           <div class="fg">
             <label>입주민 명단 CSV 올리기 (호실,이름,연락처)</label>
             <input type="file" id="csvFile" accept=".csv,text/csv" onchange="importCsv(event)">
@@ -536,7 +552,15 @@ const PRESENCE = {
   present:     '재실',
   absentPin:   '부재(비번)',
   vacantPin:   '공실(비번)',
+  hotel:       '호텔',
 };
+/* 호텔 운영 호실 — 11시 체크아웃 후 청소 중 문이 열려 있으면 진입해 작업.
+   비밀번호가 아니라 '개방 시점'이 조건이라 별도로 다룹니다. */
+const HOTEL_OPEN_FROM = '11:00';
+const HOTEL_NOTE = '11시 체크아웃 후 청소 중 문이 열려 있으면 진입해 작업하세요. 잠겨 있으면 부재·재방문으로 표시하고 다음 시간으로 재예약하세요.';
+function isHotel(presence){ return presence === 'hotel'; }
+// 호텔 세대에 배정 가능한 시간대인지 (체크아웃 이후만)
+function slotOkForHotel(s){ return String(s.from) >= HOTEL_OPEN_FROM; }
 // 옛 자료(주간/저녁/주말 희망 등)를 새 4종으로 옮깁니다. 시간 정보는 메모로 보존.
 const PRESENCE_MIGRATE = { day:'present', evening:'present', weekend:'present', pin:'absentPin', vacant:'vacantPin' };
 const PRESENCE_OLD_LABEL = { day:'평일 주간 가능', evening:'부재·저녁 희망', weekend:'부재·주말 희망', pin:'부재·비번 제공(구)', vacant:'공실(구)' };
@@ -1067,9 +1091,10 @@ function renderUnits(){
             const st = STATUS[u.status]||STATUS.todo;
             let sub = '';
             if(u.date) sub = fmtDate(u.date).replace(/\(.\)/,'');
-            else if(u.presence) sub = ({present:'재실',absentPin:'부재',vacantPin:'공실'})[u.presence]||'';
+            else if(u.presence) sub = ({present:'재실',absentPin:'부재',vacantPin:'공실',hotel:'호텔'})[u.presence]||'';
             return `<div class="unit-tile ${st.cls}" onclick="openUnit('${u.id}')">
-              ${hasPin(u.presence) && u.pin ? '<span class="u-dot">🔑</span>' : ''}
+              ${isHotel(u.presence) ? '<span class="u-dot">🏨</span>'
+                 : (hasPin(u.presence) && u.pin ? '<span class="u-dot">🔑</span>' : '')}
               <div class="u-ho">${esc(u.ho)}</div>
               <div class="u-sub">${sub ? esc(sub) : '&nbsp;'}</div>
             </div>`;
@@ -1131,8 +1156,23 @@ function openUnit(id){
           </div>
           <div class="warn" style="margin-top:8px">작업완료로 바꾸면 비밀번호가 <strong>자동 삭제</strong>됩니다. 입주민께 비번 변경을 안내하세요.</div>
         </div>
+        <div id="umHotelWrap" style="display:${isHotel(u.presence)?'block':'none'}">
+          <div class="info" style="margin-top:8px">🏨 <strong>호텔 운영 호실</strong><br>${HOTEL_NOTE}</div>
+        </div>
       </div>
     </div>
+
+    ${isHotel(u.presence) ? `
+    <div class="sec">
+      <div class="sec-title">🏨 호텔 호실 작업 안내</div>
+      <div class="sec-body">
+        <div style="font-size:22px;font-weight:800;text-align:center;padding:6px 0">
+          11시 체크아웃 이후 진입
+        </div>
+        <div class="warn">청소 중 <strong>문이 열려 있으면</strong> 들어가 작업하세요.<br>
+          <strong>잠겨 있으면</strong> 진행 상태를 <strong>부재·재방문</strong>으로 바꿔주세요.</div>
+      </div>
+    </div>` : ''}
 
     ${(!isAdmin() && hasPin(u.presence)) ? `
     <div class="sec">
@@ -1200,7 +1240,9 @@ function openUnit(id){
   // 재실유형 클릭 시 비번칸 토글
   $('umPresence').addEventListener('click', ()=>{
     const sel = $('umPresence').querySelector('.seg-btn.on');
-    $('umPinWrap').style.display = (sel && hasPin(sel.dataset.v)) ? 'block' : 'none';
+    const v = sel ? sel.dataset.v : '';
+    $('umPinWrap').style.display   = hasPin(v)  ? 'block' : 'none';
+    $('umHotelWrap').style.display = isHotel(v) ? 'block' : 'none';
   });
   $('unitModal').classList.add('open');
 }
@@ -1227,6 +1269,8 @@ function fillSlotSelect(dateStr, cur){
   const sel = $('umSlot');
   if(!dateStr){ sel.innerHTML = '<option value="">— 날짜 먼저 —</option>'; return; }
   const list = slotsForDate(dateStr);
+  const uNow = units.find(x=>x.id===editingUnitId);
+  const hotel = uNow && isHotel(segValue('umPresence') || uNow.presence);
   sel.innerHTML = '<option value="">— 미정 —</option>' + list.map(s=>{
     // 이 세대를 포함한 실제 배정 인원 (일정 화면과 같은 숫자가 나오도록)
     const others = units.filter(u=>u.date===dateStr && u.slot===s.id && u.id!==editingUnitId).length;
@@ -1234,15 +1278,20 @@ function fillSlotSelect(dateStr, cur){
     const n = others + (mineHere ? 1 : 0);
     const cap = Number(s.cap)||0;
     const full = !mineHere && cap && others >= cap;
-    return `<option value="${s.id}" ${mineHere?'selected':''}>${s.from}~${s.to} (${n}/${cap})${full?' 정원초과':''}</option>`;
+    const tooEarly = hotel && !slotOkForHotel(s);
+    return `<option value="${s.id}" ${mineHere?'selected':''}>${s.from}~${s.to} (${n}/${cap})`
+         + `${full?' 정원초과':''}${tooEarly?' ⚠ 체크아웃 전':''}</option>`;
   }).join('');
 }
 /* 부재·재방문 세대를 남은 자리 중 가장 빠른 시간으로 옮깁니다 */
 function nextFreeSlot(afterDate){
   const t = todayStr();
+  const uNow = units.find(x=>x.id===editingUnitId);
+  const hotel = uNow && isHotel(segValue('umPresence') || uNow.presence);
   const days = config.days.map(d=>d.date).filter(d=>d && d>=t).sort();
   for(const d of days){
     for(const s of slotsForDate(d)){
+      if(hotel && !slotOkForHotel(s)) continue;   // 체크아웃 전 시간대 제외
       const n = units.filter(u=>u.date===d && u.slot===s.id && u.id!==editingUnitId).length;
       if(n < (Number(s.cap)||0)) return { date:d, slot:s.id, label:`${fmtDate(d)} ${s.from}~${s.to}` };
     }
@@ -1444,7 +1493,10 @@ function bulkAssign(){
     const capN = Number(s.cap)||0;
     let cur = units.filter(u=>u.date===date && u.slot===s.id).length;
     while(cur < capN && targets.length){
-      const u = targets.shift();
+      // 호텔 호실은 체크아웃(11시) 이전 시간대에 넣지 않습니다
+      const idx = slotOkForHotel(s) ? 0 : targets.findIndex(u=>!isHotel(u.presence));
+      if(idx < 0) break;                 // 남은 대상이 전부 호텔이면 이 시간대는 건너뜀
+      const u = targets.splice(idx,1)[0];
       u.date = date; u.slot = s.id;
       if(u.status==='todo') u.status='booked';
       u.updatedAt = Date.now();
@@ -1453,9 +1505,11 @@ function bulkAssign(){
     }
   }
   saveLocal(); renderAll();
+  const hotelLeft = targets.filter(u=>isHotel(u.presence)).length;
   toast(targets.length
-    ? `${assigned}세대 배정 · ${targets.length}세대는 정원이 차서 남았습니다`
-    : `${assigned}세대 배정 완료`, 3500);
+    ? `${assigned}세대 배정 · ${targets.length}세대 남음`
+      + (hotelLeft ? ` (호텔 ${hotelLeft}세대는 11시 이후 자리가 부족)` : ' (정원 부족)')
+    : `${assigned}세대 배정 완료`, 4500);
 }
 
 /* ═══════════════════════════════════════════
@@ -1536,9 +1590,11 @@ function renderWorksheet(){
     return;
   }
   const rows = list.map(u=>{
-    const pinCell = hasPin(u.presence)
-      ? (u.pin ? `<strong>${esc(u.pin)}</strong>` : '<span style="color:#ef4444">비번 미입력</span>')
-      : (PRESENCE[u.presence]||'—');
+    const pinCell = isHotel(u.presence)
+      ? '<strong>🏨 11시 이후 개방 시 진입</strong>'
+      : hasPin(u.presence)
+        ? (u.pin ? `<strong>${esc(u.pin)}</strong>` : '<span style="color:#ef4444">비번 미입력</span>')
+        : (PRESENCE[u.presence]||'—');
     return `<tr>
       <td style="font-weight:800;font-size:17.2px">${esc(u.ho)}</td>
       <td>${esc(slotLabel(date,u.slot)||'미정')}</td>
@@ -1677,6 +1733,33 @@ function copyUnbookedPhones(){
   const done = ()=>toast(`${list.length}건 복사 — 문자앱 받는사람에 붙여넣으세요`, 4000);
   if(navigator.clipboard) navigator.clipboard.writeText(text).then(done).catch(()=>prompt('복사하세요', text));
   else prompt('복사하세요', text);
+}
+
+// 호실 목록을 붙여넣어 재실유형을 한꺼번에 지정
+function bulkSetPresence(){
+  const raw = $('bulkPresHos').value || '';
+  const val = $('bulkPresVal').value;
+  const hos = [...new Set(raw.split(/[\s,;]+/).map(x=>x.trim().replace(/호$/,'')).filter(Boolean))];
+  if(!hos.length) return toast('호실 번호를 입력하세요');
+
+  const found = [], missing = [];
+  hos.forEach(h=>{
+    const u = units.find(x=>String(x.ho)===h);
+    if(u) found.push(u); else missing.push(h);
+  });
+  if(!found.length) return alert('입력하신 호실을 찾지 못했습니다.\n\n' + missing.join(', '));
+  if(!confirm(`${found.length}세대를 "${PRESENCE[val]}" 으로 지정합니다.\n계속할까요?`)) return;
+
+  found.forEach(u=>{
+    u.presence = val;
+    if(!hasPin(val)) u.pin = '';        // 비번을 쓰지 않는 유형이면 저장된 번호 삭제
+    u.updatedAt = Date.now();
+    pushUnit(u);
+  });
+  saveLocal(); renderAll();
+  $('bulkPresHos').value = '';
+  alert(`${found.length}세대를 "${PRESENCE[val]}" 으로 지정했습니다.`
+        + (missing.length ? `\n\n찾지 못한 호실 ${missing.length}개: ${missing.join(', ')}` : ''));
 }
 
 // ── 11. 일일 마감 요약 ──
@@ -2428,6 +2511,8 @@ async function publishPublic(force){
       bookingOpen: !!config.bookingOpen,
       days: config.days.filter(d=>d.date).map(d=>({date:d.date})),
       slots: config.slots,
+      // 호텔 운영 호실 — 입주민 예약 페이지에서 신청을 막습니다(사무소가 직접 조율)
+      hotelHos: units.filter(u=>isHotel(u.presence)).map(u=>String(u.ho)).sort(),
     };
     const pubSig = JSON.stringify(pubData);
     if(pubSig !== lastPub.pub){
