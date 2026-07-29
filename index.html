@@ -122,6 +122,12 @@ input[type=checkbox]{width:auto;-webkit-appearance:checkbox;appearance:checkbox}
 .eq-row.on{background:var(--green-bg);border-color:#86efac;color:#166534}
 .eq-row .eq-box{width:22px;height:22px;border-radius:6px;border:2px solid #cbd5e1;display:flex;align-items:center;justify-content:center;font-size:16.1px;flex-shrink:0;background:#fff}
 .eq-row.on .eq-box{background:var(--green);border-color:var(--green);color:#fff}
+/* 전체 클릭 — 회수·설치 6개를 한번에 */
+.eq-row.eq-all{background:#eef2ff;border-color:#a5b4fc;color:#3730a3;border-width:2px;margin-bottom:4px}
+.eq-row.eq-all.on{background:var(--green-bg);border-color:var(--green);color:#166534}
+.eq-row.eq-all .eq-box{border-color:#a5b4fc}
+.eq-row.eq-all.on .eq-box{background:var(--green);border-color:var(--green);color:#fff}
+.eq-sub{font-size:14.4px;font-weight:600;opacity:.75;margin-left:auto}
 
 .pin-mask{display:flex;gap:8px;align-items:center}
 .pin-mask input{flex:1;letter-spacing:2px;font-weight:800}
@@ -1257,6 +1263,9 @@ function openUnit(id){
     <div class="sec">
       <div class="sec-title">장비 회수 (기존)</div>
       <div class="sec-body">
+        <div class="eq-row eq-all" id="eqAll" onclick="toggleEqAll()">
+          <div class="eq-box"></div>전체 클릭 <span class="eq-sub">회수·설치 ${EQUIP_RET.length + EQUIP_INS.length}개 한번에</span>
+        </div>
         ${EQUIP_RET.map(e=>`
           <div class="eq-row ${u.ret[e.key]?'on':''}" data-k="ret_${e.key}" onclick="toggleEq(this)">
             <div class="eq-box">${u.ret[e.key]?'✓':''}</div>${e.label} 회수
@@ -1299,6 +1308,7 @@ function openUnit(id){
     $('umPinWrap').style.display   = hasPin(v)  ? 'block' : 'none';
     $('umHotelWrap').style.display = isHotel(v) ? 'block' : 'none';
   });
+  syncEqAll();
   $('unitModal').classList.add('open');
 }
 function pickSeg(btn, wrapId){
@@ -1311,9 +1321,30 @@ function segValue(wrapId){
   const b = $(wrapId).querySelector('.seg-btn.on, .seg-btn.on-warn');
   return b ? b.dataset.v : '';
 }
+/* 장비 체크 — 개별 클릭과 전체 클릭 ─────────────────────────
+   개별 클릭은 그대로 두고, 맨 위 「전체 클릭」으로 6개를 한번에 켜고 끕니다.
+   개별로 6개를 다 켜면 전체 클릭도 자동으로 켜진 모습이 됩니다. */
+function eqRows(){ return [...document.querySelectorAll('#umBody .eq-row[data-k]')]; }
+function setEqRow(el, on){
+  el.classList.toggle('on', on);
+  el.querySelector('.eq-box').textContent = on ? '✓' : '';
+}
+function syncEqAll(){
+  const all = eqRows();
+  const master = $('eqAll');
+  if(!master || !all.length) return;
+  setEqRow(master, all.every(r=>r.classList.contains('on')));
+}
 function toggleEq(el){
-  el.classList.toggle('on');
-  el.querySelector('.eq-box').textContent = el.classList.contains('on') ? '✓' : '';
+  setEqRow(el, !el.classList.contains('on'));
+  syncEqAll();
+}
+function toggleEqAll(){
+  const all = eqRows();
+  if(!all.length) return;
+  const turnOn = !all.every(r=>r.classList.contains('on'));   // 하나라도 비었으면 전부 켜기
+  all.forEach(r=>setEqRow(r, turnOn));
+  setEqRow($('eqAll'), turnOn);
 }
 function togglePin(){
   const i = $('umPin');
