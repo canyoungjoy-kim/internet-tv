@@ -86,7 +86,6 @@ input[type=checkbox]{width:auto;-webkit-appearance:checkbox;appearance:checkbox}
 .unit-tile .u-sub{font-size:11.5px;font-weight:700;line-height:1.15;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
 .unit-tile .u-dot{position:absolute;top:4px;right:4px;font-size:10.3px}
 .st-todo{background:#fff;border-color:#e2e8f0;color:#475569}
-.st-contacted{background:var(--yellow-bg);border-color:#fcd34d;color:#92400e}
 .st-booked{background:var(--blue-bg);border-color:#93c5fd;color:#1e40af}
 .st-done{background:var(--green-bg);border-color:#86efac;color:#166534}
 .st-absent{background:var(--orange-bg);border-color:#fdba74;color:#9a3412}
@@ -267,11 +266,10 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
           </div>
           <div class="fg"><label>재실유형 조건</label>
             <select id="bkPresence">
-              <option value="">전체 (미지정 포함)</option>
-              <option value="day">평일 주간 가능</option>
-              <option value="pin">부재 · 비번 제공</option>
-              <option value="evening">부재 · 저녁 희망</option>
-              <option value="weekend">부재 · 주말 희망</option>
+              <option value="">전체 (미확정 포함)</option>
+              <option value="present">재실</option>
+              <option value="absentPin">부재(비번)</option>
+              <option value="vacantPin">공실(비번)</option>
             </select>
           </div>
           <button class="btn btn-primary btn-full" onclick="bulkAssign()">해당 층 일괄 배정</button>
@@ -524,31 +522,31 @@ function isAdmin(){ return myRole === 'admin'; }
 function canSeePersonal(){ return myRole !== 'tech'; }   // 이름·연락처 열람
 
 const STATUS = {
-  todo:      { label:'미접촉', cls:'st-todo',      color:'#94a3b8' },
-  contacted: { label:'연락완료', cls:'st-contacted', color:'#f59e0b' },
+  todo:      { label:'미확정', cls:'st-todo',      color:'#94a3b8' },
   booked:    { label:'예약확정', cls:'st-booked',   color:'#2563eb' },
   done:      { label:'작업완료', cls:'st-done',     color:'#16a34a' },
   absent:    { label:'부재·재방문', cls:'st-absent', color:'#ea580c' },
   hold:      { label:'보류·거부', cls:'st-hold',    color:'#ef4444' },
   vacant:    { label:'공실',     cls:'st-vacant',   color:'#cbd5e1' },
 };
-const STATUS_ORDER = ['todo','contacted','booked','done','absent','hold','vacant'];
+const STATUS_ORDER = ['todo','booked','done','absent','hold','vacant'];
 
 const PRESENCE = {
-  '':        '미지정',
-  day:       '평일 주간 가능',
-  pin:       '부재 · 비번 제공',
-  evening:   '부재 · 저녁 희망',
-  weekend:   '부재 · 주말 희망',
-  vacant:    '공실',
+  '':          '미확정',
+  present:     '재실',
+  absentPin:   '부재(비번)',
+  vacantPin:   '공실(비번)',
 };
+// 옛 자료(주간/저녁/주말 희망 등)를 새 4종으로 옮깁니다. 시간 정보는 메모로 보존.
+const PRESENCE_MIGRATE = { day:'present', evening:'present', weekend:'present', pin:'absentPin', vacant:'vacantPin' };
+const PRESENCE_OLD_LABEL = { day:'평일 주간 가능', evening:'부재·저녁 희망', weekend:'부재·주말 희망', pin:'부재·비번 제공(구)', vacant:'공실(구)' };
+function hasPin(presence){ return presence==='absentPin' || presence==='vacantPin'; }
 
-// 회수 4종 (공유기·셋톱박스·리모컨·전원코드) / 설치 2종 (공유기·셋톱박스)
+// 회수 3종 (공유기·셋톱박스·리모컨) / 설치 2종 (공유기·셋톱박스)
 const EQUIP_RET = [
   { key:'router', label:'인터넷 공유기' },
   { key:'stb',    label:'셋톱박스' },
   { key:'remote', label:'리모컨' },
-  { key:'power',  label:'전원코드' },
 ];
 const EQUIP_INS = [
   { key:'router', label:'인터넷 공유기' },
@@ -786,7 +784,19 @@ function normalizeUnit(u){
   EQUIP_RET.forEach(e=>{ if(typeof u.ret[e.key]!=='boolean') u.ret[e.key]=false; });
   EQUIP_INS.forEach(e=>{ if(typeof u.ins[e.key]!=='boolean') u.ins[e.key]=false; });
   if(!u.status) u.status = 'todo';
+  if(u.status === 'contacted') u.status = 'todo';   // '연락완료' 상태 폐지 → 미확정으로 흡수
   if(u.presence===undefined) u.presence = '';
+  if(PRESENCE_MIGRATE[u.presence]){
+    const old = PRESENCE_OLD_LABEL[u.presence] || u.presence;
+    const wasOldVacant = u.presence === 'vacant';
+    u.presence = PRESENCE_MIGRATE[u.presence];
+    u.note = u.note ? u.note+` / [이전 재실유형: ${old}]` : `[이전 재실유형: ${old}]`;
+    /* 예전 "공실"은 작업 대상에서 제외되는 상태였지만, 새 "공실(비번)"은
+       관리사무소 비번으로 진입해 작업하는 세대라 포함됩니다.
+       그대로 두면 진행상태가 vacant로 남아 계속 제외되므로 미접촉으로 되돌립니다.
+       (진짜 작업 불필요한 세대는 진행 상태에서 다시 "공실"로 선택하면 됩니다) */
+    if(wasOldVacant && u.status === 'vacant') u.status = 'todo';
+  }
   if(!u.sn) u.sn = { router:'', stb:'' };
   if(typeof u.updatedAt!=='number') u.updatedAt = 0;
   splitPersonal(u);
@@ -851,14 +861,14 @@ function renderDash(){
   $('dSub').textContent = total ? `전체 ${total}세대 중 ${done}세대 완료 (공실 ${c.vacant||0} 제외)` : '세대가 없습니다 · 설정에서 생성하세요';
 
   const segs = [
-    ['done', c.done||0], ['booked', c.booked||0], ['contacted', c.contacted||0],
+    ['done', c.done||0], ['booked', c.booked||0],
     ['absent', c.absent||0], ['hold', c.hold||0], ['todo', c.todo||0]
   ];
   $('dBar').innerHTML = total ? segs.map(([k,n])=>
     n ? `<span style="width:${n/total*100}%;background:${STATUS[k].color}" title="${STATUS[k].label} ${n}"></span>` : ''
   ).join('') : '';
 
-  $('dStats').innerHTML = ['todo','contacted','booked','absent','hold','done'].map(k=>`
+  $('dStats').innerHTML = ['todo','booked','absent','hold','done'].map(k=>`
     <div class="stat-card" onclick="jumpUnits('${k}')">
       <div class="stat-num" style="color:${STATUS[k].color}">${c[k]||0}</div>
       <div class="stat-label">${STATUS[k].label}</div>
@@ -1057,9 +1067,9 @@ function renderUnits(){
             const st = STATUS[u.status]||STATUS.todo;
             let sub = '';
             if(u.date) sub = fmtDate(u.date).replace(/\(.\)/,'');
-            else if(u.presence) sub = ({day:'주간',pin:'비번',evening:'저녁',weekend:'주말',vacant:'공실'})[u.presence]||'';
+            else if(u.presence) sub = ({present:'재실',absentPin:'부재',vacantPin:'공실'})[u.presence]||'';
             return `<div class="unit-tile ${st.cls}" onclick="openUnit('${u.id}')">
-              ${u.presence==='pin' && u.pin ? '<span class="u-dot">🔑</span>' : ''}
+              ${hasPin(u.presence) && u.pin ? '<span class="u-dot">🔑</span>' : ''}
               <div class="u-ho">${esc(u.ho)}</div>
               <div class="u-sub">${sub ? esc(sub) : '&nbsp;'}</div>
             </div>`;
@@ -1111,7 +1121,7 @@ function openUnit(id){
           ${Object.entries(PRESENCE).filter(([k])=>k!=='').map(([k,v])=>
             `<button type="button" class="seg-btn ${u.presence===k?'on':''}" data-v="${k}" onclick="pickSeg(this,'umPresence')">${v}</button>`).join('')}
         </div>
-        <div id="umPinWrap" style="display:${u.presence==='pin'?'block':'none'}">
+        <div id="umPinWrap" style="display:${hasPin(u.presence)?'block':'none'}">
           <div class="fg">
             <label>현관 비밀번호 ${isAdmin()?'':'(작업용 · 수정 불가)'}</label>
             <div class="pin-mask">
@@ -1124,7 +1134,7 @@ function openUnit(id){
       </div>
     </div>
 
-    ${(!isAdmin() && u.presence==='pin') ? `
+    ${(!isAdmin() && hasPin(u.presence)) ? `
     <div class="sec">
       <div class="sec-title">현관 비밀번호</div>
       <div class="sec-body">
@@ -1190,7 +1200,7 @@ function openUnit(id){
   // 재실유형 클릭 시 비번칸 토글
   $('umPresence').addEventListener('click', ()=>{
     const sel = $('umPresence').querySelector('.seg-btn.on');
-    $('umPinWrap').style.display = (sel && sel.dataset.v==='pin') ? 'block' : 'none';
+    $('umPinWrap').style.display = (sel && hasPin(sel.dataset.v)) ? 'block' : 'none';
   });
   $('unitModal').classList.add('open');
 }
@@ -1218,9 +1228,13 @@ function fillSlotSelect(dateStr, cur){
   if(!dateStr){ sel.innerHTML = '<option value="">— 날짜 먼저 —</option>'; return; }
   const list = slotsForDate(dateStr);
   sel.innerHTML = '<option value="">— 미정 —</option>' + list.map(s=>{
-    const n = units.filter(u=>u.date===dateStr && u.slot===s.id && u.id!==editingUnitId).length;
-    const full = n >= (Number(s.cap)||0);
-    return `<option value="${s.id}" ${cur===s.id?'selected':''}>${s.from}~${s.to} (${n}/${s.cap})${full?' 정원초과':''}</option>`;
+    // 이 세대를 포함한 실제 배정 인원 (일정 화면과 같은 숫자가 나오도록)
+    const others = units.filter(u=>u.date===dateStr && u.slot===s.id && u.id!==editingUnitId).length;
+    const mineHere = cur===s.id;
+    const n = others + (mineHere ? 1 : 0);
+    const cap = Number(s.cap)||0;
+    const full = !mineHere && cap && others >= cap;
+    return `<option value="${s.id}" ${mineHere?'selected':''}>${s.from}~${s.to} (${n}/${cap})${full?' 정원초과':''}</option>`;
   }).join('');
 }
 /* 부재·재방문 세대를 남은 자리 중 가장 빠른 시간으로 옮깁니다 */
@@ -1254,7 +1268,7 @@ function saveUnitModal(){
     setContact(u.ho, $('umName').value.trim(), $('umPhone').value.trim());
     pushContact(u.ho);
     u.presence = segValue('umPresence');
-    u.pin = u.presence==='pin' ? ($('umPin')?$('umPin').value.trim():'') : '';
+    u.pin = hasPin(u.presence) ? ($('umPin')?$('umPin').value.trim():'') : '';
     u.date = $('umDate').value;
     u.slot = $('umSlot').value;
     u.tech = $('umTech').value;
@@ -1275,8 +1289,7 @@ function saveUnitModal(){
   // 완료 처리 시 비밀번호 자동 삭제 (개인정보 보호)
   if(u.status==='done' && u.pin){ u.pin=''; toast('🔐 작업완료 — 저장된 비밀번호를 삭제했습니다', 3200); }
   // 예약이 잡히면 상태를 자동 승격 (미접촉/연락완료 → 예약확정)
-  if(u.date && u.slot && (u.status==='todo'||u.status==='contacted')) u.status='booked';
-  if(u.presence==='vacant') u.status='vacant';
+  if(u.date && u.slot && u.status==='todo') u.status='booked';
 
   u.updatedAt = Date.now();
   saveLocal(); pushUnit(u); renderAll(); closeUnitModal();
@@ -1433,7 +1446,7 @@ function bulkAssign(){
     while(cur < capN && targets.length){
       const u = targets.shift();
       u.date = date; u.slot = s.id;
-      if(u.status==='todo'||u.status==='contacted') u.status='booked';
+      if(u.status==='todo') u.status='booked';
       u.updatedAt = Date.now();
       pushUnit(u);
       cur++; assigned++;
@@ -1523,7 +1536,7 @@ function renderWorksheet(){
     return;
   }
   const rows = list.map(u=>{
-    const pinCell = u.presence==='pin'
+    const pinCell = hasPin(u.presence)
       ? (u.pin ? `<strong>${esc(u.pin)}</strong>` : '<span style="color:#ef4444">비번 미입력</span>')
       : (PRESENCE[u.presence]||'—');
     return `<tr>
@@ -1532,7 +1545,7 @@ function renderWorksheet(){
       ${canSeePersonal() ? `<td>${esc(nameOf(u))}</td><td>${esc(phoneOf(u))}</td>` : ''}
       <td>${pinCell}</td>
       <td>${esc(u.tech||'')}</td>
-      <td style="letter-spacing:3px;white-space:nowrap">☐☐☐☐</td>
+      <td style="letter-spacing:3px;white-space:nowrap">☐☐☐</td>
       <td style="letter-spacing:3px;white-space:nowrap">☐☐</td>
       <td style="min-width:70px"></td>
     </tr>`;
@@ -1545,7 +1558,7 @@ function renderWorksheet(){
         <table class="tbl">
           <thead><tr>
             <th>호실</th><th>시간</th>${canSeePersonal()?'<th>성명</th><th>연락처</th>':''}<th>비번/재실</th><th>기사</th>
-            <th>회수<br><span style="font-weight:600">공유기·셋톱·리모컨·전원</span></th>
+            <th>회수<br><span style="font-weight:600">공유기·셋톱·리모컨</span></th>
             <th>설치<br><span style="font-weight:600">공유기·셋톱</span></th>
             <th>확인</th>
           </tr></thead>
@@ -1621,24 +1634,24 @@ function downloadCsv(filename, rows){
 }
 function exportCsv(){
   const rows = [['호실','층','이름','연락처','재실유형','작업일','시간대','기사','상태',
-                 '공유기회수','셋톱회수','리모컨회수','전원코드회수','공유기설치','셋톱설치',
+                 '공유기회수','셋톱회수','리모컨회수','공유기설치','셋톱설치',
                  '공유기S/N','셋톱S/N','메모']];
   units.slice().sort((a,b)=>a.floor-b.floor||String(a.ho).localeCompare(String(b.ho))).forEach(u=>{
     rows.push([u.ho,u.floor,nameOf(u),phoneOf(u),PRESENCE[u.presence]||'',
       u.date||'', slotLabel(u.date,u.slot), u.tech||'', STATUS[u.status].label,
-      u.ret.router?'O':'', u.ret.stb?'O':'', u.ret.remote?'O':'', u.ret.power?'O':'',
+      u.ret.router?'O':'', u.ret.stb?'O':'', u.ret.remote?'O':'',
       u.ins.router?'O':'', u.ins.stb?'O':'',
       u.sn.router||'', u.sn.stb||'', u.note||'']);
   });
   downloadCsv(`장비교체_세대현황_${todayStr()}.csv`, rows);
 }
 function exportEquipCsv(){
-  const rows = [['호실','이름','작업일','기사','공유기회수','셋톱회수','리모컨회수','전원코드회수',
+  const rows = [['호실','이름','작업일','기사','공유기회수','셋톱회수','리모컨회수',
                  '공유기설치','셋톱설치','공유기S/N','셋톱S/N','미회수사유']];
   units.filter(u=>u.status==='done'||EQUIP_RET.some(e=>u.ret[e.key])).forEach(u=>{
     const miss = EQUIP_RET.filter(e=>!u.ret[e.key]).map(e=>e.label).join('·');
     rows.push([u.ho,nameOf(u),u.date||'',u.tech||'',
-      u.ret.router?'O':'X', u.ret.stb?'O':'X', u.ret.remote?'O':'X', u.ret.power?'O':'X',
+      u.ret.router?'O':'X', u.ret.stb?'O':'X', u.ret.remote?'O':'X',
       u.ins.router?'O':'X', u.ins.stb?'O':'X',
       u.sn.router||'', u.sn.stb||'', miss?`미회수(${miss}) ${u.note||''}`:'']);
   });
@@ -1820,7 +1833,11 @@ function renderSettings(){
     `<div class="help">각 층 <strong>01호부터 연속</strong>으로 만듭니다. 예: 2~4층 35세대 → 201~235호, 5~10층 36세대 → 501~536호.<br>
      중간에 빠지는 호수가 있으면 생성 후 해당 세대를 <strong>공실</strong>로 바꾸거나, CSV로 실제 호실 목록을 올리세요.</div>`;
 
-  $('dataInfo').textContent = `세대 ${units.length} · 완료 ${counts().done||0} · 기사 ${(config.techs||[]).length}명`;
+  const ctN = Object.values(contacts).filter(c=>c && (c.name||c.phone)).length;
+  $('dataInfo').innerHTML = `세대 ${units.length} · 완료 ${counts().done||0} · 기사 ${(config.techs||[]).length}명`
+    + `<br>연락처 등록 <strong style="color:${ctN?'inherit':'var(--red)'}">${ctN}</strong>건`
+    + (canSeePersonal() ? (ctN ? '' : ' — 통계 탭에서 명단 CSV를 다시 올려주세요')
+                        : ' (이 계정은 개인정보를 받지 않습니다)');
   $('verInfo').textContent = `${APP_VERSION} · 마지막 동기화 ${lastSyncAt?new Date(lastSyncAt).toLocaleString('ko-KR'):'없음'}`;
 
   renderCloudStatus();
@@ -1837,7 +1854,7 @@ function delDay(i){
   const d = config.days[i];
   const n = units.filter(u=>u.date===d.date).length;
   if(n && !confirm(`${fmtDate(d.date)} 에 ${n}세대가 예약되어 있습니다.\n삭제하면 그 세대들의 예약이 해제됩니다. 계속할까요?`)) return;
-  units.forEach(u=>{ if(u.date===d.date){ u.date=''; u.slot=''; if(u.status==='booked') u.status='contacted'; u.updatedAt=Date.now(); pushUnit(u); } });
+  units.forEach(u=>{ if(u.date===d.date){ u.date=''; u.slot=''; if(u.status==='booked') u.status='todo'; u.updatedAt=Date.now(); pushUnit(u); } });
   config.days.splice(i,1); config.updatedAt=Date.now();
   saveLocal(); pushConfig(); renderSettings();
 }
@@ -2172,6 +2189,11 @@ function subscribeCloud(){
         return;
       }
       const hadPersonal = !!(d.name || d.phone);   // 옛 구조로 올라와 있던 문서
+      /* 이름·연락처는 어느 쪽이 최신이든 항상 먼저 건져냅니다.
+         (기기 자료가 더 최신이면 서버 문서를 버리게 되는데,
+          그때 이름까지 같이 버려져 연락처가 비는 문제가 있었습니다) */
+      if(hadPersonal) splitPersonal(d);
+
       const i = units.findIndex(u=>u.id===ch.doc.id);
       if(i<0) units.push(markServerState(normalizeUnit(d)));
       else if((d.updatedAt||0) >= (units[i].updatedAt||0)) units[i] = markServerState(normalizeUnit(d));
@@ -2183,9 +2205,10 @@ function subscribeCloud(){
     saveLocal(); renderAll();
     // 관리자가 접속했을 때 개인정보를 contacts 로 옮기고 units 에서 지웁니다
     if(legacy.length && isAdmin()){
+      toast(`개인정보 ${legacy.length}건을 분리 보관으로 옮기는 중…`, 4000);
       legacy.forEach(id=>{
         const u = units.find(x=>x.id===id);
-        if(u){ pushUnit(u); pushContact(u.ho); }
+        if(u){ pushUnit(u, true); pushContact(u.ho); }   // 통째로 덮어써 옛 필드를 제거
       });
     }
   }, err=>{ console.error(err); toast('동기화 오류: '+err.code, 4000); });
@@ -2248,7 +2271,7 @@ function applyBooking(b){
   // 입주민이 취소한 예약
   if(b.cancelled){
     u.date=''; u.slot='';
-    if(u.status==='booked') u.status='contacted';
+    if(u.status==='booked') u.status='todo';
     u.bookedAtMs = b.at||Date.now();
     u.note = (u.note? u.note+' / ':'') + '[입주민] 예약 취소';
     u.updatedAt = Date.now();
@@ -2257,7 +2280,8 @@ function applyBooking(b){
   }
   u.date = b.date||'';
   u.slot = b.slot||'';
-  u.presence = b.presence || u.presence;
+  // 예약 접수함에 옛 값('day'/'pin')이 남아 있어도 새 체계로 받습니다
+  u.presence = PRESENCE_MIGRATE[b.presence] || b.presence || u.presence;
   if(b.pin) u.pin = b.pin;
   if(b.name && !nameOf(u)){ setContact(u.ho, b.name, undefined); pushContact(u.ho); }
   if(b.note) u.note = (u.note? u.note+' / ':'') + '[입주민] ' + b.note;
@@ -2269,7 +2293,7 @@ function applyBooking(b){
   pushUnit(u);
   return true;
 }
-async function pushUnit(u){
+async function pushUnit(u, full){
   if(!firebaseDB || !cloudUser || cloudApplying) return;
   try{
     const { doc, setDoc } = window._fb;
@@ -2278,8 +2302,10 @@ async function pushUnit(u){
     delete clean._srv;
 
     /* 같은 세대를 두 사람이 동시에 고쳐도 서로의 입력이 사라지지 않도록,
-       바뀐 항목만 골라 병합 저장합니다. (예: A는 회수 체크, B는 메모 입력) */
-    const srv = u._srv;
+       바뀐 항목만 골라 병합 저장합니다. (예: A는 회수 체크, B는 메모 입력)
+       단 full=true 이면 문서를 통째로 덮어씁니다 — 병합 저장은 값을 지우지 못하므로,
+       옛 구조에 남아 있는 이름·연락처를 서버에서 없앨 때 필요합니다. */
+    const srv = full ? null : u._srv;
     let payload = clean, opts = undefined;
     if(srv){
       const diff = {};
@@ -2291,6 +2317,7 @@ async function pushUnit(u){
       payload = diff; opts = { merge:true };
     }
     await setDoc(doc(firebaseDB,'sites',SITE_ID,'units',u.id), payload, opts);
+    markServerState(u);
     if(failedPushes.delete(u.id)) renderPushBanner();
     schedulePublish();
   }catch(e){

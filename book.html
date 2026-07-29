@@ -519,7 +519,7 @@ async function doSubmit(){
         phone4: sel.ph4,
         date: sel.date,
         slot: sel.slot,
-        presence: sel.mode==='pin' ? 'pin' : 'day',
+        presence: sel.mode==='pin' ? 'absentPin' : 'present',
         pin: sel.pin,
         note: $('inNote').value.trim(),
         cancelled: false,
@@ -528,7 +528,7 @@ async function doSubmit(){
     });
 
     myBooking = { ho:sel.ho, phone4:sel.ph4, date:sel.date, slot:sel.slot,
-                  presence: sel.mode==='pin'?'pin':'day', cancelled:false };
+                  presence: sel.mode==='pin'?'absentPin':'present', cancelled:false };
     await loadAvail();
 
     const sl = slotsFor(sel.date).find(x=>x.id===sel.slot);
