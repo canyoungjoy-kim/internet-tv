@@ -3124,14 +3124,18 @@ service cloud.firestore {
         allow write: if isAdmin();
       }
       // 예약 페이지가 읽는 공개 정보 — 개인정보 없음(작업일·시간대·정원)
+      //  ※ 관리자만 씁니다. 작업일·시간대는 관리자만 바꿀 수 있는데, 옛 일정이 남은
+      //    직원 기기가 덮어쓰면 입주민 화면에 없앤 날짜가 되살아납니다.
       match /meta/public {
         allow read: if request.auth != null;
-        allow write: if isAdmin() || isStaff();
+        allow write: if isAdmin();
       }
       // 본인확인용 해시 목록 — 원본 번호는 들어있지 않음
+      //  ※ 관리자만 씁니다. 연락처를 관리하는 계정이 관리자뿐인데 직원 기기가
+      //    이 문서를 덮어쓰면 명단이 빈 채로 올라가 본인확인이 통째로 풀립니다.
       match /meta/roster {
         allow read: if request.auth != null;
-        allow write: if isAdmin() || isStaff();
+        allow write: if isAdmin();
       }
       // 시간대별 예약 인원 (숫자만)
       match /meta/avail {
@@ -3415,7 +3419,14 @@ function subscribeCloud(){
       /* 예약 원본을 통째로 들고 있습니다.
          세대 목록이 아직 안 왔거나 잠시 저장이 막혀 반영에 실패해도,
          나중에 다시 시도할 수 있어야 예약이 유실되지 않습니다. */
-      bookingIndex.set(String(d.ho), Object.assign({}, d, { id:ch.doc.id }));
+      /* 한 세대에 예약 문서가 두 개 있으면(잔재), 어느 것이 나중에 도착하느냐에 따라
+         기기마다 다른 시간이 보일 수 있습니다. 항상 '더 나중에 접수된 것'을 기준으로 삼아
+         관리자 기기와 직원 기기가 같은 화면을 보게 합니다. */
+      const ho = String(d.ho);
+      const prev = bookingIndex.get(ho);
+      const keep = !prev || prev.id === ch.doc.id || (d.at||0) >= (prev.at||0);
+      if(!keep) return;
+      bookingIndex.set(ho, Object.assign({}, d, { id:ch.doc.id }));
       if(applyBooking(d, ch.doc.id)) n++;
     });
     bookingsLoaded = true;
@@ -3514,8 +3525,14 @@ function applyBookingInner(b, docId){
     if(appendNote(u, '[입주민] 예약 취소')) touched = true;
   }else{
     // 예약 접수함에 옛 값('day'/'pin')이 남아 있어도 새 체계로 받습니다
-    set('presence', PRESENCE_MIGRATE[b.presence] || b.presence || u.presence);
+    const oldPres = u.presence;
+    const newPres = PRESENCE_MIGRATE[b.presence] || b.presence || u.presence;
+    set('presence', newPres);
     if(b.pin) set('pin', b.pin);
+    /* 부재(비번)로 예약했다가 「직접 재실」로 바꾸시면 남겨두신 임시 비밀번호를 지웁니다.
+       안 지우면 재실 세대인데도 작업요청서에 옛 현관 비밀번호가 그대로 인쇄됩니다.
+       (사무소가 직접 넣은 공실·호텔 비번은 건드리지 않습니다) */
+    else if(oldPres === 'absentPin' && !hasPin(newPres)) set('pin', '');
     if(b.name && !nameOf(u)){ setContact(u.ho, b.name, undefined); pushContact(u.ho); }
     if(b.note && appendNote(u, '[입주민] ' + b.note)) touched = true;
     set('bookedBy', 'self');
@@ -3807,6 +3824,11 @@ async function publishPublic(force){
   try{
     const { doc, setDoc } = window._fb;
 
+    /* ⚠ 세대 자료를 아직 못 받은 기기는 공개정보를 절대 올리면 안 됩니다.
+       빈 명단을 올리면 입주민 화면에 "호실을 찾을 수 없습니다" 가 뜨고
+       그 순간부터 아무도 예약을 못 합니다. */
+    if(!units.length){ publishDirty = true; return; }
+
     const pubData = {
       siteName: config.siteName,
       bookingOpen: !!config.bookingOpen,
@@ -3815,8 +3837,13 @@ async function publishPublic(force){
       // 호텔 운영 호실 — 입주민 예약 페이지에서 신청을 막습니다(사무소가 직접 조율)
       hotelHos: units.filter(u=>isHotel(u.presence)).map(u=>String(u.ho)).sort(),
     };
+    /* ── 입주민 예약 페이지가 보는 공개정보(작업일·시간대·정원) ──
+       ⚠ 관리자만 올립니다.
+         작업일과 시간대는 관리자만 바꿀 수 있는데, 직원 기기에 옛 일정이 남아 있으면
+         그것을 서버에 덮어써 입주민 화면에 이미 없앤 날짜가 되살아납니다.
+         (본인확인 명단이 직원 기기 때문에 통째로 비워졌던 것과 같은 종류입니다) */
     const pubSig = JSON.stringify(pubData);
-    if(pubSig !== lastPub.pub){
+    if(isAdmin() && pubSig !== lastPub.pub){
       await setDoc(doc(firebaseDB,'sites',SITE_ID,'meta','public'), Object.assign({at:Date.now()}, pubData));
       lastPub.pub = pubSig;
     }
@@ -3828,21 +3855,36 @@ async function publishPublic(force){
       lastPub.avail = availSig;
     }
 
-    // 해시 계산은 무거우므로 호실·연락처가 실제로 바뀐 경우에만
+    /* ── 본인확인 명단 ──
+       ⚠ 이 문서를 잘못 올리면 본인확인이 통째로 풀립니다.
+         연락처를 아직 못 받은 기기(예: 직원 기기가 막 접속한 순간)가 올리면
+         모든 세대의 해시가 빈 값이 되어, 누구나 뒷 4자리 없이 남의 호실을
+         예약할 수 있게 되고 예약 문서도 '호실_0000' 으로 따로 만들어져
+         한 세대에 예약이 두 건씩 생깁니다. 실제로 그렇게 됐습니다.
+       그래서 두 겹으로 막습니다.
+         ① 연락처를 관리하는 관리자 계정만 올립니다
+         ② 연락처를 한 건도 못 받은 상태면 올리지 않습니다 */
     const rSig = rosterSig();
-    if(rSig !== lastPub.roster){
-      const hashes = {};
-      for(const u of units){
-        if(u.status==='vacant') continue;
-        const p4 = ctOf(u).phone4;
-        if(p4 && p4.length===4){
-          hashes[u.ho] = await sha256hex(`${SITE_ID}:${u.ho}:${p4}`);
-        } else {
-          hashes[u.ho] = '';   // 연락처 미등록 세대 → 뒷4자리 확인 없이 진행
+    if(isAdmin() && rSig !== lastPub.roster){
+      const active = units.filter(u=>u.status!=='vacant');
+      const withPhone = active.filter(u=>{ const p = ctOf(u).phone4; return p && p.length===4; }).length;
+      if(!withPhone && active.length){
+        console.warn('연락처를 못 받아 본인확인 명단 발행을 건너뜁니다');
+        publishDirty = true;             // 연락처가 도착하면 다시 시도
+      } else {
+        const hashes = {};
+        for(const u of units){
+          if(u.status==='vacant') continue;
+          const p4 = ctOf(u).phone4;
+          if(p4 && p4.length===4){
+            hashes[u.ho] = await sha256hex(`${SITE_ID}:${u.ho}:${p4}`);
+          } else {
+            hashes[u.ho] = '';   // 연락처 미등록 세대 → 뒷4자리 확인 없이 진행
+          }
         }
+        await setDoc(doc(firebaseDB,'sites',SITE_ID,'meta','roster'), { hashes, at: Date.now() });
+        lastPub.roster = rSig;
       }
-      await setDoc(doc(firebaseDB,'sites',SITE_ID,'meta','roster'), { hashes, at: Date.now() });
-      lastPub.roster = rSig;
     }
     await reconcileSlots(counts);
   }catch(e){
