@@ -288,11 +288,19 @@ function isLocked(date){
   if(now.date > date) return true;           // 예약일이 지났으면 잠금
   return now.hour >= CUTOFF_HOUR;            // 당일 07:00 부터 잠금
 }
-async function loadAvail(){
-  const { collection, getDocs } = fbm;
-  const snap = await getDocs(collection(db,'sites',SITE_ID,'slots'));
-  avail = {};
+/* 잔여석 읽기 —
+   예전에는 전체 시간대(5일치 26개)를 통째로 두 번씩 읽어, 예약 한 건에
+   50회가 넘는 조회가 발생했습니다. 세대가 많으면 Firebase 하루 한도를 위협합니다.
+   지금은 '고른 날짜'의 시간대만 읽습니다 (하루 4~6개). */
+const availLoaded = new Set();
+async function loadAvailFor(dateStr, force){
+  if(!dateStr) return;
+  if(!force && availLoaded.has(dateStr)) return;
+  const { collection, getDocs, query, where } = fbm;
+  const snap = await getDocs(query(collection(db,'sites',SITE_ID,'slots'),
+                                   where('date','==',dateStr)));
   snap.forEach(d=>{ avail[d.id] = (d.data().n)||0; });
+  availLoaded.add(dateStr);
 }
 
 function $(id){ return document.getElementById(id); }
@@ -365,7 +373,7 @@ async function boot(){
     ]);
     pub    = pSnap.exists() ? pSnap.data() : null;
     roster = rSnap.exists() ? (rSnap.data().hashes||{}) : {};
-    await loadAvail();
+    // 잔여석은 날짜를 고른 뒤에 그 날짜만 읽습니다 (조회 수 절감)
 
     $('loading').classList.add('hide');
     if(!pub){
@@ -488,12 +496,16 @@ function renderDays(){
       <div class="dw">${dowOf(d)}요일</div>
     </button>`).join('') || '<div class="muted">등록된 작업일이 없습니다</div>';
 }
-function pickDay(d){
+async function pickDay(d){
   sel.date = d; sel.slot = '';
-  renderDays(); renderSlots();
+  renderDays();
+  $('slotPick').innerHTML = '<div class="muted">잔여석 확인 중…</div>';
   $('stepSlot').classList.remove('hide');
   $('stepSubmit').classList.add('hide');
   setTimeout(()=>$('stepSlot').scrollIntoView({behavior:'smooth', block:'start'}), 80);
+  try{ await loadAvailFor(d, true); }
+  catch(e){ console.error(e); }
+  if(sel.date === d) renderSlots();
 }
 
 /* ── 4. 시간 ── */
@@ -548,6 +560,8 @@ async function doSubmit(){
   try{
     const s = slotsFor(sel.date).find(x=>x.id===sel.slot);
     const cap = Number(s && s.cap) || 0;
+    // 트랜잭션 밖에서도 결과를 알아야 잔여석을 손으로 맞출 수 있습니다
+    let wasHere = false, movedFrom = null;
 
     /* 정원 초과를 서버가 막습니다.
        여러 사람이 같은 순간에 눌러도 트랜잭션이 순서를 정해주므로
@@ -570,6 +584,8 @@ async function doSubmit(){
 
       const n = newSnap.exists() ? (newSnap.data().n||0) : 0;
       const alreadyHere = prev && !moving;       // 같은 시간대로 재신청 = 인원 변화 없음
+      wasHere = !!alreadyHere;
+      movedFrom = moving ? { date:prev.date, slot:prev.slot } : null;
       if(!alreadyHere && cap && n >= cap){
         const e = new Error('방금 그 시간대가 마감되었습니다. 다른 시간을 선택해 주세요.');
         e.__full = true; throw e;
@@ -592,9 +608,15 @@ async function doSubmit(){
       });
     });
 
+    /* 잔여석은 방금 우리가 바꾼 만큼만 손으로 맞춥니다.
+       (전체를 다시 읽으면 조회 수만 크게 늘어납니다) */
+    if(!wasHere){
+      avail[slotKey(sel.date, sel.slot)] = (avail[slotKey(sel.date, sel.slot)]||0) + 1;
+      if(movedFrom) avail[slotKey(movedFrom.date, movedFrom.slot)] =
+        Math.max(0, (avail[slotKey(movedFrom.date, movedFrom.slot)]||0) - 1);
+    }
     myBooking = { ho:sel.ho, phone4:sel.ph4, date:sel.date, slot:sel.slot,
                   presence: sel.mode==='pin'?'absentPin':'present', cancelled:false };
-    await loadAvail();
 
     const sl = slotsFor(sel.date).find(x=>x.id===sel.slot);
     $('doneWhen').textContent = `${fmtDate(sel.date)}\n${fmtTime(sl.from)} ~ ${fmtTime(sl.to)}`;
@@ -609,7 +631,7 @@ async function doSubmit(){
     $('stepDone').classList.remove('hide');
     window.scrollTo({top:0, behavior:'smooth'});
   }catch(e){
-    if(e.__full){ await loadAvail(); renderSlots(); }
+    if(e.__full){ try{ await loadAvailFor(sel.date, true); }catch(x){} renderSlots(); }
     fail(e.message || '신청에 실패했습니다. 잠시 후 다시 시도해 주세요.');
   }
   btn.disabled = false; btn.textContent = '이 시간으로 예약 신청';
@@ -635,8 +657,9 @@ async function cancelBooking(){
       tx.set(bkRef, { ho:myBooking.ho, phone4:myBooking.phone4, date:'', slot:'',
                       cancelled:true, at:Date.now() });
     });
+    avail[slotKey(myBooking.date, myBooking.slot)] =
+      Math.max(0, (avail[slotKey(myBooking.date, myBooking.slot)]||0) - 1);
     myBooking = null;
-    await loadAvail();
     alert('예약이 취소되었습니다.');
     restart();
   }catch(e){
