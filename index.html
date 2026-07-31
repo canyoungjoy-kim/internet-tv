@@ -194,6 +194,16 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 .ws-sheet.pers .eq-l{font-size:10.8px}
 .ws-sheet.pers .eq-b{font-size:17px}
 
+/* 예약 수신 상태등 */
+.bk-h{margin:0 0 10px;padding:11px 13px;border-radius:11px;font-size:15.5px;font-weight:800;border:1.5px solid}
+.bk-h .bk-s{font-size:14px;font-weight:600;opacity:.9}
+.bk-ok{background:#dcfce7;border-color:#86efac;color:#166534}
+.bk-err{background:#fee2e2;border-color:#fca5a5;color:#991b1b}
+.bk-wait{background:#f1f5f9;border-color:var(--border);color:var(--muted)}
+.ul-item-warn{display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid var(--border);font-size:15px;font-weight:700}
+.ul-item-warn>div{flex:1}
+.ul-item-warn:last-child{border-bottom:none}
+
 .link-box{display:flex;gap:6px;align-items:stretch}
 .link-box input{font-size:14.4px;font-family:ui-monospace,monospace}
 
@@ -251,6 +261,11 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
         </div>
         <div class="pbar" id="dBar"></div>
       </div>
+
+      <!-- 입주민 예약 수신 상태 — 예약이 조용히 유실되지 않도록 항상 표시 -->
+      <div id="bkHealth"></div>
+      <!-- 확인이 필요한 예약 (본인확인 불일치 / 완료 후 접수) -->
+      <div id="bkIssues"></div>
 
       <div class="stats-grid" id="dStats"></div>
 
@@ -588,6 +603,12 @@ function roleOfEmail(email){
 }
 function isAdmin(){ return myRole === 'admin'; }
 function canSeePersonal(){ return myRole !== 'tech'; }   // 이름·연락처 열람
+/* 입주민 예약함(bookings)을 통째로 받아 세대에 반영할 수 있는 권한.
+   규칙에서도 관리자·직원만 목록 조회가 허용되어 있으므로 반드시 일치시켜야 합니다.
+   기사 계정이 구독을 시도하면 권한 거부가 나고, 예약이 조용히 사라집니다. */
+function canSeeBookings(){ return myRole === 'admin' || myRole === 'staff'; }
+// 공개정보(meta/*)·잔여석 카운터를 올릴 수 있는 권한 — 규칙과 같은 기준
+function canPublish(){ return canSeeBookings(); }
 
 const STATUS = {
   todo:      { label:'미확정', cls:'st-todo',      color:'#94a3b8' },
@@ -649,7 +670,19 @@ let unsubUnits=null, unsubConfig=null, unsubBookings=null, unsubContacts=null;
 let cloudApplying = false;
 let lastSyncAt = null;
 let badBookings = [];      // 본인확인이 어긋난 예약 (수동 확인 필요)
+let lateBookings = [];     // 이미 작업완료된 세대에 들어온 예약 (수동 확인 필요)
 let failedPushes = new Map();  // id → 재시도 대기 중인 세대
+
+/* 예약함 상태 — 예약이 조용히 유실되는 일이 없도록 항상 화면에 표시합니다.
+   'off' 기사 계정(반영 대상 아님) / 'wait' 연결 전 / 'ok' 정상 / 'err' 읽기 실패 */
+let bookingHealth = 'wait';
+let bookingHealthMsg = '';
+let bookingsLoaded = false;
+/* 예약함 사본 — 호실 → { id, date, slot, cancelled, at }
+   아직 세대에 반영되지 않은 예약도 잔여석 계산에 넣기 위해 들고 있습니다. */
+let bookingIndex = new Map();
+// 입주민 예약을 받아 적는 중인지 — 예약함에 되돌려 쓰는 순환을 막습니다
+let applyingBooking = false;
 
 /* ═══════════════════════════════════════════
    유틸
@@ -936,7 +969,56 @@ function counts(){
 }
 function activeUnits(){ return units.filter(u=>u.status!=='vacant'); }
 
+/* 예약 수신 상태등 —
+   "입주민은 예약했는데 사무소 화면에는 안 뜬다"를 즉시 알아채기 위한 표시입니다. */
+function renderBookingHealth(){
+  const box = $('bkHealth');
+  if(!box) return;
+  if(!cloudUser){
+    box.innerHTML = `<div class="bk-h bk-wait">⚪ 로그인 전 — 입주민 예약을 받지 않는 상태입니다</div>`;
+  } else if(bookingHealth === 'err'){
+    box.innerHTML = `<div class="bk-h bk-err">
+      🔴 <b>입주민 예약함을 읽지 못하고 있습니다</b><br>
+      <span class="bk-s">${esc(bookingHealthMsg)} — 이 상태에서는 새 예약이 화면에 뜨지 않습니다.
+      관리자 계정으로 로그인했는지 확인하시고, 계속되면 Firestore 규칙을 다시 붙여넣어 주세요.</span>
+      <button class="btn btn-outline btn-sm" style="margin-top:7px" onclick="forceSync()">다시 시도</button>
+    </div>`;
+  } else if(bookingHealth === 'off'){
+    box.innerHTML = `<div class="bk-h bk-wait">⚪ ${esc(bookingHealthMsg)}</div>`;
+  } else if(bookingHealth === 'ok'){
+    const pend = [...bookingIndex.values()].filter(b=>!b.cancelled && b.date && b.slot).length;
+    box.innerHTML = `<div class="bk-h bk-ok">🟢 입주민 예약 정상 수신 중
+      <span class="bk-s">· 접수 ${pend}건${lastSyncAt?' · 최근 '+new Date(lastSyncAt).toLocaleTimeString('ko-KR'):''}</span></div>`;
+  } else {
+    box.innerHTML = `<div class="bk-h bk-wait">⚪ 예약함 연결 중…</div>`;
+  }
+  renderBookingIssues();
+}
+/* 조용히 버려질 뻔한 예약을 드러냅니다 */
+function renderBookingIssues(){
+  const box = $('bkIssues');
+  if(!box) return;
+  const rows = [];
+  badBookings.forEach((b,i)=>rows.push(`
+    <div class="ul-item-warn">
+      <div><b>${esc(b.ho)}호</b> — 등록된 연락처와 뒷 4자리가 다릅니다 (입력 ${esc(b.phone4)})<br>
+        <span class="bk-s">번호가 바뀐 세대일 수 있습니다. 확인 후 연락처를 고치고 동기화하면 반영됩니다.</span></div>
+      <button class="btn btn-outline btn-sm" onclick="dismissBad(${i})">확인함</button>
+    </div>`));
+  lateBookings.forEach((b,i)=>rows.push(`
+    <div class="ul-item-warn">
+      <div><b>${esc(b.ho)}호</b> — 작업완료 뒤에 예약이 들어왔습니다${b.date?` (${esc(fmtDate(b.date))})`:''}<br>
+        <span class="bk-s">재작업 요청일 수 있습니다. 필요하면 상태를 되돌리고 일정을 다시 잡아주세요.</span></div>
+      <button class="btn btn-outline btn-sm" onclick="dismissLate(${i})">확인함</button>
+    </div>`));
+  box.innerHTML = rows.length ? `<div class="sec"><div class="sec-title" style="color:var(--red)">
+      ❗ 확인이 필요한 예약 ${rows.length}건</div><div>${rows.join('')}</div></div>` : '';
+}
+function dismissBad(i){ badBookings.splice(i,1); renderBookingIssues(); }
+function dismissLate(i){ lateBookings.splice(i,1); renderBookingIssues(); }
+
 function renderDash(){
+  renderBookingHealth();
   const c = counts();
   const total = activeUnits().length;
   const done = c.done||0;
@@ -2580,10 +2662,18 @@ service cloud.firestore {
     function changed() {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
+    // 설치기사 — 작업 결과만 입력. 일정·개인정보는 손댈 수 없습니다
     function onlyWorkFields() {
       return changed().hasOnly(['ret','ins','sn','status','note','updatedAt','pin'])
              // 비밀번호는 '지우는 것'만 허용 (작업완료 시 자동 삭제)
              && (!changed().hasAny(['pin']) || request.resource.data.pin == '');
+    }
+    // 관리실 직원 — 위에 더해 '입주민 예약을 세대에 반영'하는 데 필요한 일정 항목까지
+    // (이름·연락처는 units 문서에 아예 없으므로 여기서도 볼 수 없습니다)
+    function staffFields() {
+      return changed().hasOnly(['ret','ins','sn','status','note','updatedAt','pin',
+                                'date','slot','tech','presence',
+                                'bookedBy','bookedAt','bookedAtMs']);
     }
 
     match /sites/{site} {
@@ -2592,7 +2682,9 @@ service cloud.firestore {
       match /units/{unitId} {
         allow read:   if isAdmin() || isWorker();
         allow create, delete: if isAdmin();
-        allow update: if isAdmin() || (isWorker() && onlyWorkFields());
+        allow update: if isAdmin()
+                      || (isStaff() && staffFields())
+                      || (isTech()  && onlyWorkFields());
       }
 
       // 입주민 이름·연락처 — 관리자와 직원만. 기사는 읽기 자체가 불가
@@ -2609,17 +2701,17 @@ service cloud.firestore {
       // 예약 페이지가 읽는 공개 정보 — 개인정보 없음(작업일·시간대·정원)
       match /meta/public {
         allow read: if request.auth != null;
-        allow write: if isAdmin();
+        allow write: if isAdmin() || isStaff();
       }
       // 본인확인용 해시 목록 — 원본 번호는 들어있지 않음
       match /meta/roster {
         allow read: if request.auth != null;
-        allow write: if isAdmin();
+        allow write: if isAdmin() || isStaff();
       }
       // 시간대별 예약 인원 (숫자만)
       match /meta/avail {
         allow read: if request.auth != null;
-        allow write: if isAdmin();
+        allow write: if isAdmin() || isStaff();
       }
 
       // 입주민 예약 접수함
@@ -2630,9 +2722,12 @@ service cloud.firestore {
         // 접수가 열려 있을 때만, 그리고 문서ID가 호실_뒷4자리와 일치할 때만
         allow create, update: if request.auth != null
           && bookingId == request.resource.data.ho + '_' + request.resource.data.phone4
-          && (isAdmin() || isWorker()
+          && (isAdmin() || isStaff()
               || get(/databases/$(db)/documents/sites/$(site)/meta/public).data.bookingOpen == true);
-        allow list, delete: if isAdmin();
+        // 관리사무소(관리자·직원)는 예약함 전체를 받아 세대에 반영해야 합니다.
+        // 설치기사는 목록 조회 불가 — 세대별 작업요청서에 필요한 정보만 받습니다.
+        allow list:   if isAdmin() || isStaff();
+        allow delete: if isAdmin();
       }
 
       // 시간대별 예약 인원 — 정원 초과를 서버에서 막기 위한 카운터
@@ -2864,23 +2959,61 @@ function subscribeCloud(){
     lastSyncAt = Date.now();
   }, err=>console.error(err));
 
-  // 입주민 예약 접수함 → 세대에 반영
+  /* 입주민 예약 접수함 → 세대에 반영
+     기사 계정은 규칙상 목록 조회가 막혀 있습니다. 구독을 시도하면 권한 거부가 나고
+     예약이 화면에 안 뜨는데 아무 표시도 없어, 예약이 유실된 것처럼 보였습니다.
+     그래서 권한이 있는 계정만 구독하고, 실패하면 반드시 화면에 알립니다. */
+  if(!canSeeBookings()){
+    bookingsLoaded = true;                 // 기사 계정은 예약 반영 주체가 아님
+    setBookingHealth('off', '이 계정은 예약 반영 대상이 아닙니다 (관리자·직원 담당)');
+    return;
+  }
   unsubBookings = onSnapshot(collection(firebaseDB,'sites',SITE_ID,'bookings'), snap=>{
     let n = 0;
     snap.docChanges().forEach(ch=>{
-      if(ch.type==='removed') return;
-      if(applyBooking(ch.doc.data())) n++;
+      const d = ch.doc.data();
+      if(ch.type==='removed'){ if(d && d.ho) bookingIndex.delete(String(d.ho)); return; }
+      if(d && d.ho){
+        bookingIndex.set(String(d.ho), { id:ch.doc.id, date:d.date||'', slot:d.slot||'',
+                                         cancelled:!!d.cancelled, at:d.at||0 });
+      }
+      if(applyBooking(d, ch.doc.id)) n++;
     });
+    bookingsLoaded = true;
+    setBookingHealth('ok', `예약 ${bookingIndex.size}건 수신 중`);
     if(n){ saveLocal(); renderAll(); toast(`📩 입주민 예약 ${n}건이 반영되었습니다`, 3200); }
-  }, err=>console.error(err));
+    else renderBookingHealth();
+  }, err=>{
+    console.error('예약함 구독 실패', err);
+    setBookingHealth('err', pushErrText(err));
+    toast(`⚠️ 입주민 예약함을 읽지 못했습니다 — ${pushErrText(err)}`, 9000);
+  });
+}
+function setBookingHealth(state, msg){
+  bookingHealth = state; bookingHealthMsg = msg || '';
+  renderBookingHealth();
 }
 // 입주민이 넣은 예약을 세대 레코드에 반영
-function applyBooking(b){
+function applyBooking(b, docId){
+  applyingBooking = true;
+  try{ return applyBookingInner(b, docId); }
+  finally{ applyingBooking = false; }
+}
+function applyBookingInner(b, docId){
   if(!b || !b.ho) return false;
   const u = units.find(x=>String(x.ho)===String(b.ho));
   if(!u) return false;
+  if(docId) u.bookingId = docId;      // 사무소가 일정을 바꿀 때 되돌려 쓸 주소
   if((b.at||0) <= (u.bookedAtMs||0)) return false;   // 이미 반영된 건
-  if(u.status==='done') return false;                 // 완료된 세대는 건드리지 않음
+  /* 이미 작업이 끝난 세대에 예약이 들어오면 일정은 건드리지 않되,
+     조용히 버리지 않고 소장님께 알립니다 (재작업 요청일 수 있습니다) */
+  if(u.status==='done'){
+    if(!b.cancelled && !lateBookings.some(x=>x.ho===b.ho && x.at===b.at)){
+      lateBookings.push({ ho:b.ho, date:b.date||'', slot:b.slot||'', at:b.at||0 });
+      renderAll();
+    }
+    return false;
+  }
 
   /* 본인확인 재검증 — 화면에서만 막지 않고 서버 자료와 대조합니다.
      등록된 뒷 4자리와 다르면 반영하지 않고 소장님께 알립니다. */
@@ -2898,7 +3031,7 @@ function applyBooking(b){
     u.date=''; u.slot='';
     if(u.status==='booked') u.status='todo';
     u.bookedAtMs = b.at||Date.now();
-    u.note = (u.note? u.note+' / ':'') + '[입주민] 예약 취소';
+    appendNote(u, '[입주민] 예약 취소');
     u.updatedAt = Date.now();
     pushUnit(u);
     return true;
@@ -2909,7 +3042,7 @@ function applyBooking(b){
   u.presence = PRESENCE_MIGRATE[b.presence] || b.presence || u.presence;
   if(b.pin) u.pin = b.pin;
   if(b.name && !nameOf(u)){ setContact(u.ho, b.name, undefined); pushContact(u.ho); }
-  if(b.note) u.note = (u.note? u.note+' / ':'') + '[입주민] ' + b.note;
+  if(b.note) appendNote(u, '[입주민] ' + b.note);
   u.bookedBy = 'self';
   u.bookedAtMs = b.at||Date.now();
   u.bookedAt = new Date(b.at||Date.now()).toLocaleString('ko-KR');
@@ -2918,6 +3051,56 @@ function applyBooking(b){
   pushUnit(u);
   return true;
 }
+/* 메모 덧붙이기 — 예약·취소를 반복하면 같은 문장이 끝없이 쌓여
+   메모칸을 못 쓰게 되므로, 같은 내용의 연속 반복과 전체 길이를 제한합니다. */
+const NOTE_MAX = 500;
+function appendNote(u, line){
+  if(!line) return;
+  const cur = u.note || '';
+  const parts = cur ? cur.split(' / ') : [];
+  if(parts[parts.length-1] === line) return;        // 직전과 같은 내용이면 생략
+  parts.push(line);
+  let out = parts.join(' / ');
+  while(out.length > NOTE_MAX && parts.length > 1){  // 길면 오래된 것부터 버립니다
+    parts.shift();
+    out = '…/ ' + parts.join(' / ');
+  }
+  u.note = out.slice(0, NOTE_MAX);
+}
+
+/* 사무소가 일정을 바꾸면 입주민 예약함에도 되돌려 씁니다.
+   이걸 안 하면 입주민 화면에는 옛 시간이 남고, 거기서 변경하면
+   사무소가 옮긴 일정이 되돌아갑니다.
+   at 값은 그대로 두어 우리 자신의 변경이 다시 반영되는 순환을 막습니다. */
+async function pushBookingUpdate(u){
+  if(!firebaseDB || !cloudUser || cloudApplying) return;
+  if(!canSeeBookings()) return;
+  if(!u.bookingId) return;              // 입주민이 직접 넣은 예약이 아닌 경우
+  try{
+    const { doc, setDoc } = window._fb;
+    await setDoc(doc(firebaseDB,'sites',SITE_ID,'bookings', u.bookingId), {
+      date: u.date || '',
+      slot: u.slot || '',
+      cancelled: !(u.date && u.slot),
+      byOffice: true,
+      at: u.bookedAtMs || 0,
+    }, { merge:true });
+    const bi = bookingIndex.get(String(u.ho));
+    if(bi){ bi.date = u.date||''; bi.slot = u.slot||''; bi.cancelled = !(u.date && u.slot); }
+  }catch(e){
+    console.error('예약함 갱신 실패', u.ho, e);
+    toast(`⚠️ ${u.ho}호 예약 시간을 입주민 화면에 반영하지 못했습니다`, 6000);
+  }
+}
+
+/* 서버 규칙이 허용하는 항목 — 규칙(RULES_TEXT)과 반드시 같아야 합니다.
+   관리자가 아닌 계정이 문서 전체를 올리면 규칙에 걸려 저장이 통째로 거부됩니다.
+   그래서 역할별로 보낼 항목을 미리 걸러 냅니다. */
+const WRITABLE_KEYS = {
+  staff: ['ret','ins','sn','status','note','updatedAt','pin',
+          'date','slot','tech','presence','bookedBy','bookedAt','bookedAtMs'],
+  tech:  ['ret','ins','sn','status','note','updatedAt','pin'],
+};
 async function pushUnit(u, full){
   if(!firebaseDB || !cloudUser || cloudApplying) return;
   try{
@@ -2925,6 +3108,7 @@ async function pushUnit(u, full){
     const clean = JSON.parse(JSON.stringify(u));
     delete clean.name; delete clean.phone; delete clean.phone4;   // 개인정보는 여기에 담지 않음
     delete clean._srv;
+    delete clean.bookingId;      // 기기 안에서만 쓰는 값
 
     /* 같은 세대를 두 사람이 동시에 고쳐도 서로의 입력이 사라지지 않도록,
        바뀐 항목만 골라 병합 저장합니다. (예: A는 회수 체크, B는 메모 입력)
@@ -2941,7 +3125,25 @@ async function pushUnit(u, full){
       diff.updatedAt = clean.updatedAt;
       payload = diff; opts = { merge:true };
     }
+    /* 관리자가 아니면 규칙이 허용한 항목만, 반드시 병합 저장으로 보냅니다.
+       (아직 서버 자료를 못 받아 기준점이 없을 때 문서 전체를 올려
+        저장이 통째로 거부되던 문제를 막습니다) */
+    const allowed = WRITABLE_KEYS[myRole];
+    if(allowed){
+      const only = {};
+      allowed.forEach(k=>{ if(k in payload) only[k] = payload[k]; });
+      if(Object.keys(only).filter(k=>k!=='updatedAt').length === 0) return;
+      only.updatedAt = clean.updatedAt;
+      payload = only; opts = { merge:true };
+    }
+    const before = u._srv;
     await setDoc(doc(firebaseDB,'sites',SITE_ID,'units',u.id), payload, opts);
+    /* 사무소가 일정을 옮겼다면 입주민 예약함에도 같은 내용을 적어둡니다.
+       (입주민이 넣은 예약을 우리가 받아 적는 중일 때는 되돌려 쓸 필요가 없습니다) */
+    if(!applyingBooking && u.bookingId && before &&
+       (before.date !== clean.date || before.slot !== clean.slot)){
+      pushBookingUpdate(u);
+    }
     markServerState(u);
     if(failedPushes.delete(u.id)) renderPushBanner();
     schedulePublish();
@@ -3018,12 +3220,25 @@ async function sha256hex(str){
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
   return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
 }
+/* 시간대별 사용 인원.
+   세대(units)에 반영된 예약뿐 아니라, 방금 들어와 아직 반영 전인 예약함(bookings)의
+   건도 함께 셉니다. 이걸 빼면 반영되기 전 몇 초 사이에 잔여석을 0으로 되돌려 써서
+   같은 시간대에 정원을 넘겨 예약이 잡힐 수 있습니다. */
 function availCounts(){
   const avail = {};
   config.days.filter(d=>d.date).forEach(d=>{
-    slotsForDate(d.date).forEach(s=>{
-      avail[d.date+'|'+s.id] = units.filter(u=>u.date===d.date && u.slot===s.id).length;
-    });
+    slotsForDate(d.date).forEach(s=>{ avail[d.date+'|'+s.id] = 0; });
+  });
+  units.forEach(u=>{
+    const k = u.date+'|'+u.slot;
+    if(u.date && u.slot && k in avail) avail[k]++;
+  });
+  bookingIndex.forEach((b, ho)=>{
+    if(b.cancelled || !b.date || !b.slot) return;
+    const u = units.find(x=>String(x.ho)===String(ho));
+    if(u && u.date===b.date && u.slot===b.slot) return;   // 이미 위에서 셌음
+    const k = b.date+'|'+b.slot;
+    if(k in avail) avail[k]++;
   });
   return avail;
 }
@@ -3043,6 +3258,7 @@ function rosterSig(){
 }
 async function publishPublic(force){
   if(!firebaseDB || !cloudUser) return;
+  if(!canPublish()) return;             // 기사 계정은 공개정보를 올릴 권한이 없습니다
   if(!force && !publishDirty) return;   // 변경 없으면 아무것도 쓰지 않음
   publishDirty = false;
   try{
@@ -3094,7 +3310,10 @@ async function publishPublic(force){
 /* 시간대 카운터를 실제 배정 현황과 맞춥니다.
    (사무소에서 일괄 배정한 건도 예약 페이지의 잔여석에 반영되도록) */
 async function reconcileSlots(counts){
-  if(!isAdmin()) return;
+  if(!canPublish()) return;
+  /* 예약함을 아직 한 번도 못 받았으면 잔여석을 건드리지 않습니다.
+     받기 전 자료로 덮어쓰면 이미 들어온 예약의 자리가 사라집니다. */
+  if(!bookingsLoaded) return;
   const { doc, setDoc } = window._fb;
   for(const [key, n] of Object.entries(counts)){
     const [date, slot] = key.split('|');
@@ -3105,11 +3324,17 @@ async function reconcileSlots(counts){
     lastPub.slots[key] = n;
   }
 }
+/* 수동 동기화.
+   한 단계가 실패해도 나머지는 끝까지 진행합니다.
+   예전에는 예약함 조회에서 예외가 나면 그 뒤가 통째로 중단돼,
+   직원 계정에서는 동기화가 항상 실패하고 세대 자료도 갱신되지 않았습니다. */
 async function forceSync(){
   if(!firebaseDB || !cloudUser) return toast('먼저 로그인하세요');
   $('syncBtn').textContent='동기화중';
+  const fails = [];
+  const { collection, getDocs } = window._fb;
+
   try{
-    const { collection, getDocs, doc, getDoc } = window._fb;
     const snap = await getDocs(collection(firebaseDB,'sites',SITE_ID,'units'));
     cloudApplying = true;
     snap.forEach(d=>{
@@ -3119,19 +3344,54 @@ async function forceSync(){
       else if((data.updatedAt||0) >= (units[i].updatedAt||0)) units[i]=normalizeUnit(data);
     });
     cloudApplying = false;
-    const bs = await getDocs(collection(firebaseDB,'sites',SITE_ID,'bookings'));
-    bs.forEach(d=>applyBooking(d.data()));
-    await publishPublic(true);   // 수동 동기화는 무조건 다시 올림
-    lastSyncAt = Date.now();
-    saveLocal(); renderAll();
-    toast('동기화 완료');
-  }catch(e){ toast('동기화 실패: '+e.message, 4000); }
+  }catch(e){ cloudApplying = false; fails.push('세대 자료'); console.error('세대 동기화', e); }
+
+  if(canSeeBookings()){
+    try{
+      const bs = await getDocs(collection(firebaseDB,'sites',SITE_ID,'bookings'));
+      bs.forEach(d=>{
+        const data = d.data();
+        if(data && data.ho){
+          bookingIndex.set(String(data.ho), { id:d.id, date:data.date||'', slot:data.slot||'',
+                                              cancelled:!!data.cancelled, at:data.at||0 });
+        }
+        applyBooking(data, d.id);
+      });
+      bookingsLoaded = true;
+      setBookingHealth('ok', `예약 ${bookingIndex.size}건 수신 중`);
+    }catch(e){
+      fails.push('입주민 예약함');
+      setBookingHealth('err', pushErrText(e));
+      console.error('예약함 동기화', e);
+    }
+  }
+
+  if(canPublish()){
+    try{ await publishPublic(true); }      // 수동 동기화는 무조건 다시 올림
+    catch(e){ fails.push('공개정보 발행'); console.error('발행', e); }
+  }
+
+  lastSyncAt = Date.now();
+  saveLocal(); renderAll();
+  toast(fails.length ? `⚠️ 일부 실패: ${fails.join(', ')}` : '동기화 완료', fails.length?6000:2500);
   $('syncBtn').textContent='동기화';
   subscribeCloud();
 }
 
 // 바뀐 것이 있을 때만 주기적으로 올립니다 (변경이 없으면 쓰기가 발생하지 않음)
 setInterval(()=>{ if(cloudUser && publishDirty) publishPublic(); }, 60000);
+
+/* 저장 실패분 자동 재시도 —
+   지하나 엘리베이터에서 신호가 끊겨 저장이 밀렸을 때,
+   사람이 배너를 눌러야만 올라가던 것을 자동으로 처리합니다. */
+let retryBusy = false;
+async function autoRetry(){
+  if(retryBusy || !failedPushes.size || !cloudUser || !navigator.onLine) return;
+  retryBusy = true;
+  try{ await retryPushes(); } finally{ retryBusy = false; }
+}
+window.addEventListener('online', ()=>{ setTimeout(autoRetry, 1200); });
+setInterval(autoRetry, 45000);
 
 /* ═══════════════════════════════════════════
    시작
