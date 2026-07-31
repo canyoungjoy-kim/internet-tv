@@ -303,6 +303,24 @@ async function loadAvailFor(dateStr, force){
   availLoaded.add(dateStr);
 }
 
+/* 안내 정보 다시 읽기 —
+   예약 화면을 며칠 열어둔 채로 제출하시는 분이 계십니다. 그 사이 사무소가
+   작업일을 바꾸거나 접수를 닫았으면, 없어진 날짜로 예약이 들어가 일정표에서
+   사라지거나 알 수 없는 오류 문구가 뜹니다. 보내기 직전에 한 번만 다시 읽습니다. */
+async function refreshPub(){
+  try{
+    const { doc, getDoc } = fbm;
+    const s = await getDoc(doc(db,'sites',SITE_ID,'meta','public'));
+    if(s.exists()) pub = s.data();
+  }catch(e){ console.error('안내 정보 갱신 실패', e); }
+  return pub;
+}
+/* 서버가 권한으로 막았을 때는 영어 원문 대신 이유를 우리말로 알려드립니다 */
+function isDenied(e){
+  return !!(e && (e.code === 'permission-denied'
+                  || /insufficient permissions|PERMISSION_DENIED/i.test(e.message||'')));
+}
+
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function dowOf(d){ const x=new Date(d+'T00:00:00'); return isNaN(x)?'':DOW[x.getDay()]; }
@@ -412,9 +430,13 @@ async function doVerify(){
     const got = await sha256hex(`${SITE_ID}:${ho}:${ph4}`);
     if(got !== expect) return fail('호실과 연락처가 일치하지 않습니다.\n관리사무소(032-710-5679)로 문의해 주세요.');
   }
-  // 연락처 미등록 세대는 뒷4자리 확인 없이 통과 (입력값은 그대로 저장해 대조에 씁니다)
+  // 연락처 미등록 세대는 뒷4자리 확인 없이 통과합니다.
 
-  sel.ho = ho; sel.ph4 = ph4 || '0000';
+  /* 예약 문서의 이름이 '호실_뒷4자리' 입니다.
+     연락처 미등록 세대에서 방문할 때마다 다른 숫자를 넣으면 문서가 여러 개 만들어져,
+     한 세대가 두 시간대를 동시에 점유하고 사무소 화면에는 한 건만 보이게 됩니다.
+     그래서 미등록 세대는 입력값과 관계없이 0000 으로 고정해 세대당 한 건만 남깁니다. */
+  sel.ho = ho; sel.ph4 = expect ? ph4 : '0000';
 
   // 이미 넣어둔 예약이 있으면 보여드립니다
   try{
@@ -558,6 +580,25 @@ async function doSubmit(){
   const btn = $('btnSubmit');
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span> 신청 중…';
   try{
+    /* 화면을 오래 열어두신 사이에 접수가 마감되거나 작업일이 바뀌었을 수 있습니다.
+       보내기 직전에 최신 안내를 한 번만 다시 읽어 확인합니다. */
+    await refreshPub();
+    if(!pub || !pub.bookingOpen){
+      throw new Error('예약 접수가 마감되었습니다.\n관리사무소(032-710-5679)로 연락해 주세요.');
+    }
+    if(!(pub.days||[]).some(d=>d.date===sel.date)){
+      sel.date=''; sel.slot='';
+      renderDays();
+      $('stepSlot').classList.add('hide'); $('stepSubmit').classList.add('hide');
+      throw new Error('선택하신 날짜가 작업일에서 변경되었습니다.\n날짜를 다시 선택해 주세요.');
+    }
+    if(!slotsFor(sel.date).some(x=>x.id===sel.slot)){
+      sel.slot='';
+      await loadAvailFor(sel.date, true); renderSlots();
+      $('stepSubmit').classList.add('hide');
+      throw new Error('선택하신 시간대가 변경되었습니다.\n시간을 다시 선택해 주세요.');
+    }
+
     const s = slotsFor(sel.date).find(x=>x.id===sel.slot);
     const cap = Number(s && s.cap) || 0;
     // 트랜잭션 밖에서도 결과를 알아야 잔여석을 손으로 맞출 수 있습니다
@@ -573,7 +614,12 @@ async function doSubmit(){
 
       // 읽기는 쓰기보다 먼저 (Firestore 트랜잭션 규칙)
       const newSnap = await tx.get(newRef);
-      const prev = myBooking && !myBooking.cancelled ? myBooking : null;
+      /* 기존 예약은 화면에 담아둔 값이 아니라 지금 서버에 있는 값을 씁니다.
+         화면을 열어둔 사이에 사무소가 시간을 옮겼거나 다른 기기에서 바꿨을 수 있는데,
+         옛 값으로 계산하면 엉뚱한 시간대의 잔여석을 깎아 자리 수가 어긋납니다. */
+      const bkSnap = await tx.get(bkRef);
+      const cur = bkSnap.exists() ? bkSnap.data() : null;
+      const prev = (cur && !cur.cancelled && cur.date && cur.slot) ? cur : null;
       const moving = prev && (prev.date !== sel.date || prev.slot !== sel.slot);
       let oldRef = null, oldN = 0;
       if(moving){
@@ -632,7 +678,9 @@ async function doSubmit(){
     window.scrollTo({top:0, behavior:'smooth'});
   }catch(e){
     if(e.__full){ try{ await loadAvailFor(sel.date, true); }catch(x){} renderSlots(); }
-    fail(e.message || '신청에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+    fail(isDenied(e)
+      ? '지금은 예약 접수가 닫혀 있습니다.\n관리사무소(032-710-5679)로 연락해 주세요.'
+      : (e.message || '신청에 실패했습니다. 잠시 후 다시 시도해 주세요.'));
   }
   btn.disabled = false; btn.textContent = '이 시간으로 예약 신청';
 }
@@ -663,7 +711,9 @@ async function cancelBooking(){
     alert('예약이 취소되었습니다.');
     restart();
   }catch(e){
-    alert('취소에 실패했습니다. 잠시 후 다시 시도하거나 관리사무소(032-710-5679)로 문의해 주세요.');
+    alert(isDenied(e)
+      ? '예약 접수가 마감되어 온라인 취소가 불가합니다.\n관리사무소(032-710-5679)로 연락해 주세요.'
+      : '취소에 실패했습니다. 잠시 후 다시 시도하거나 관리사무소(032-710-5679)로 문의해 주세요.');
   }
 }
 
