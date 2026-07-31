@@ -179,6 +179,13 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 .ws-sheet table.tbl{font-size:17.7px}
 .ws-sheet table.tbl th{font-size:15.2px}
 .ws-sheet .nw{white-space:nowrap}
+/* 입주민 요청 — 세대 줄 바로 아래에 붙습니다 */
+.ws-sheet tr.ws-memo td{background:#fffbeb;border-top:none;padding-top:3px;padding-bottom:7px;
+  font-size:0.86em;font-weight:700;color:#78350f;text-align:left;line-height:1.5;white-space:normal}
+.ws-memo-tag{display:inline-block;background:#f59e0b;color:#fff;border-radius:5px;
+  padding:1px 7px;margin-right:7px;font-size:0.88em;font-weight:800;white-space:nowrap}
+.ws-sheet tbody.ws-row tr:first-child td{border-bottom:none}
+.ws-sheet tbody.ws-row{border-bottom:1px solid var(--border)}
 /* 성명·연락처를 넣으면 자리가 빠듯해지므로 본문 글씨를 약간 줄입니다 */
 .ws-sheet.pers table.tbl{font-size:15.6px}
 .ws-sheet.pers table.tbl th{font-size:13.6px}
@@ -193,6 +200,27 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 .ws-sheet.pers .eq-c{width:34px}
 .ws-sheet.pers .eq-l{font-size:10.8px}
 .ws-sheet.pers .eq-b{font-size:17px}
+
+/* 입주민 요청 메모 */
+.memo-item{padding:11px 13px;border-bottom:1px solid var(--border);cursor:pointer}
+.memo-item:last-child{border-bottom:none}
+.memo-item:active{background:#f8fafc}
+.memo-item.picked{background:#eff6ff}
+.memo-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.memo-chk{width:26px;height:26px;border-radius:7px;border:2px solid #cbd5e1;background:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;
+  color:#fff;flex-shrink:0;cursor:pointer}
+.memo-chk.on{background:var(--blue);border-color:var(--blue)}
+.memo-bar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:2px 0 8px}
+.memo-cnt{font-size:14.4px;font-weight:700;color:var(--muted);margin-left:auto}
+.memo-ho{font-size:18.4px;font-weight:800}
+.memo-when{font-size:14px;font-weight:700;color:var(--muted);margin-left:auto}
+.memo-who{font-size:14.4px;font-weight:700;color:var(--muted);margin-top:2px}
+.memo-body{margin-top:5px;padding:9px 11px;background:#fffbeb;border-left:4px solid #fcd34d;
+  border-radius:0 8px 8px 0;font-size:16.1px;font-weight:600;line-height:1.55;color:#78350f;
+  white-space:pre-wrap;word-break:break-word}
+#dMemoSec .sec-title{display:flex;align-items:center;gap:8px}
+#dMemoSec .sec-title button{margin-left:auto}
 
 /* 예약 수신 상태등 */
 .bk-h{margin:0 0 10px;padding:11px 13px;border-radius:11px;font-size:15.5px;font-weight:800;border:1.5px solid}
@@ -228,6 +256,10 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
   .sec-title{background:#eee;border-bottom:1px solid #999}
   .pgbreak{page-break-after:always}
   table.tbl tr{page-break-inside:avoid}
+  /* 세대 줄과 그 요청메모가 페이지 사이에서 갈라지지 않도록 */
+  .ws-sheet tbody.ws-row{page-break-inside:avoid}
+  .ws-sheet tr.ws-memo td{background:#fffbeb!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .ws-memo-tag{background:#f59e0b!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   table.tbl thead{display:table-header-group}
   .ws-floor{page-break-before:always}
   .ws-floor:first-of-type{page-break-before:auto}
@@ -277,6 +309,16 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
       <div class="sec">
         <div class="sec-title">⚠️ 조치 필요</div>
         <div id="dAlerts"></div>
+      </div>
+
+      <!-- 입주민이 예약할 때 남긴 요청 메모 -->
+      <div class="sec" id="dMemoSec">
+        <div class="sec-title">
+          📝 입주민 요청 메모 <span id="dMemoCount"></span>
+          <button class="btn btn-outline btn-sm no-print" id="dMemoFilter" onclick="toggleMemoFilter()">미완료만</button>
+        </div>
+        <div id="dMemo"></div>
+        <div class="sec-body no-print" id="dMemoBtns" style="padding-top:0"></div>
       </div>
 
       <div class="sec">
@@ -1017,8 +1059,153 @@ function renderBookingIssues(){
 function dismissBad(i){ badBookings.splice(i,1); renderBookingIssues(); }
 function dismissLate(i){ lateBookings.splice(i,1); renderBookingIssues(); }
 
+/* ── 입주민 요청 메모 ──────────────────────────────
+   입주민이 예약할 때 남긴 글은 메모칸에 '[입주민] …' 으로 들어옵니다.
+   사무소가 적은 메모와 자동으로 붙는 '예약 취소' 기록은 빼고,
+   입주민이 직접 쓴 말만 골라 호실별로 모아 보여줍니다. */
+const MEMO_TAG = '[입주민] ';
+const MEMO_AUTO = ['[입주민] 예약 취소'];
+function residentNotes(u){
+  if(!u.note) return [];
+  return u.note.split(' / ')
+    .map(s=>s.trim())
+    .filter(s=>s.startsWith(MEMO_TAG) && !MEMO_AUTO.includes(s))
+    .map(s=>s.slice(MEMO_TAG.length).trim())
+    .filter(Boolean);
+}
+function memoUnits(){
+  return units.filter(u=>residentNotes(u).length)
+              .sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999')
+                        || sortBySlotThenHo(a,b));
+}
+let memoOnlyOpen = false;    // 미완료만 보기
+function toggleMemoFilter(){ memoOnlyOpen = !memoOnlyOpen; renderMemos(); }
+
+/* 호실 선택 — 고른 세대만 뽑아 쓸 수 있게 합니다.
+   아무것도 안 고르면 화면에 보이는 전체가 대상입니다. */
+let memoSel = new Set();
+function memoVisible(){
+  const all = memoUnits();
+  return memoOnlyOpen ? all.filter(u=>u.status!=='done') : all;
+}
+// 실제로 뽑아 쓸 대상 — 선택이 있으면 선택분만, 없으면 보이는 전체
+function memoTargets(){
+  const vis = memoVisible();
+  const picked = vis.filter(u=>memoSel.has(u.id));
+  return picked.length ? picked : vis;
+}
+function toggleMemoPick(ev, id){
+  ev.stopPropagation();                 // 세대 상세가 열리지 않도록
+  if(memoSel.has(id)) memoSel.delete(id); else memoSel.add(id);
+  renderMemos();
+}
+function memoPickAll(){
+  const vis = memoVisible();
+  const allOn = vis.length && vis.every(u=>memoSel.has(u.id));
+  vis.forEach(u=>{ if(allOn) memoSel.delete(u.id); else memoSel.add(u.id); });
+  renderMemos();
+}
+function memoClearPick(){ memoSel.clear(); renderMemos(); }
+
+function renderMemos(){
+  const box = $('dMemo'); if(!box) return;
+  const all = memoUnits();
+  const list = memoOnlyOpen ? all.filter(u=>u.status!=='done') : all;
+  const open = all.filter(u=>u.status!=='done').length;
+
+  $('dMemoCount').innerHTML = all.length
+    ? `<span style="color:var(--text)">${all.length}건</span>` +
+      (open ? ` <span style="color:var(--red)">· 미완료 ${open}</span>` : '')
+    : '';
+  const fb = $('dMemoFilter');
+  if(fb){
+    fb.textContent = memoOnlyOpen ? '전체 보기' : '미완료만';
+    fb.style.display = all.length ? '' : 'none';
+  }
+
+  if(!list.length){
+    box.innerHTML = `<div class="empty" style="padding:22px"><p>${
+      all.length ? '미완료인 요청이 없습니다' : '입주민이 남긴 메모가 아직 없습니다'}</p></div>`;
+    $('dMemoBtns').innerHTML = '';
+    return;
+  }
+
+  box.innerHTML = list.map(u=>{
+    const when = u.date ? `${fmtDate(u.date)} ${slotLabel(u.date,u.slot)||''}`.trim() : '일정 미정';
+    const who  = canSeePersonal()
+      ? [nameOf(u), phoneOf(u)].filter(Boolean).join(' · ')
+      : '';
+    const on = memoSel.has(u.id);
+    return `<div class="memo-item ${on?'picked':''}" onclick="openUnit('${u.id}')">
+      <div class="memo-head">
+        <span class="memo-chk ${on?'on':''}" onclick="toggleMemoPick(event,'${u.id}')">${on?'✓':''}</span>
+        <span class="memo-ho">${esc(u.ho)}호</span>
+        <span class="badge ${STATUS[u.status].cls}">${STATUS[u.status].label}</span>
+        <span class="memo-when">${esc(when)}</span>
+      </div>
+      ${who ? `<div class="memo-who">${esc(who)}</div>` : ''}
+      ${residentNotes(u).map(t=>`<div class="memo-body">“${esc(t)}”</div>`).join('')}
+    </div>`;
+  }).join('');
+
+  const picked = list.filter(u=>memoSel.has(u.id)).length;
+  const allOn  = list.length && list.every(u=>memoSel.has(u.id));
+  const target = memoTargets().length;
+  $('dMemoBtns').innerHTML = `
+    <div class="memo-bar">
+      <button class="btn btn-outline btn-sm" onclick="memoPickAll()">${allOn?'전체 해제':'전체 선택'}</button>
+      ${picked ? `<button class="btn btn-outline btn-sm" onclick="memoClearPick()">선택 취소</button>` : ''}
+      <span class="memo-cnt">${picked ? `<b>${picked}개 선택됨</b>` : `선택 없음 · 보이는 ${list.length}곳 전체`}</span>
+    </div>
+    <button class="btn btn-outline btn-full btn-sm" onclick="copyMemos()">📋 메모 복사 (${target}곳)</button>
+    ${canSeePersonal() ? `
+      <button class="btn btn-outline btn-full btn-sm" onclick="copyMemoPhones()">📞 연락처만 복사 (${target}곳)</button>
+      <button class="btn btn-outline btn-full btn-sm" onclick="exportMemoCsv()">⬇ CSV 내려받기 (${target}곳)</button>` : ''}
+    <div class="help">
+      네모를 눌러 호실을 고르면 <strong>고른 세대만</strong> 뽑아 옵니다. 아무것도 안 고르면 보이는 전체가 대상입니다.<br>
+      <strong>연락처만 복사</strong>는 문자앱 받는사람 칸에 그대로 붙여넣을 수 있습니다.
+      세대를 누르면 상세가 열립니다.
+    </div>`;
+}
+function memoLines(withContact){
+  return memoTargets()
+    .map(u=>{
+      const when = u.date ? `${fmtDate(u.date)} ${slotLabel(u.date,u.slot)||''}`.trim() : '일정 미정';
+      const who = withContact && canSeePersonal()
+        ? ` ${[nameOf(u),phoneOf(u)].filter(Boolean).join(' ')}` : '';
+      // 메모 안에 줄바꿈이 있어도 들여쓰기가 흐트러지지 않도록 맞춰 줍니다
+      const body = residentNotes(u)
+        .map(t=>'  · ' + t.replace(/\n/g, '\n    '))
+        .join('\n');
+      return `${u.ho}호${who} [${STATUS[u.status].label}] ${when}\n${body}`;
+    });
+}
+function copyMemos(){
+  const txt = memoLines(true).join('\n\n');
+  if(!txt) return toast('복사할 메모가 없습니다');
+  navigator.clipboard ? navigator.clipboard.writeText(txt).then(()=>toast('메모를 복사했습니다'))
+                      : prompt('복사하세요', txt);
+}
+// 고른 세대의 연락처만 — 문자앱 받는사람 칸에 그대로 붙여넣습니다
+function copyMemoPhones(){
+  const list = memoTargets().map(u=>phoneOf(u)).filter(Boolean);
+  if(!list.length) return toast('연락처가 등록된 세대가 없습니다');
+  const txt = list.join(', ');
+  navigator.clipboard ? navigator.clipboard.writeText(txt).then(()=>toast(`연락처 ${list.length}건을 복사했습니다`))
+                      : prompt('복사하세요', txt);
+}
+function exportMemoCsv(){
+  const rows = [['호실','이름','연락처','작업일','시간대','상태','입주민 메모']];
+  memoTargets().forEach(u=>{
+    rows.push([u.ho, nameOf(u), phoneOf(u), u.date||'', slotLabel(u.date,u.slot),
+               STATUS[u.status].label, residentNotes(u).join(' / ')]);
+  });
+  downloadCsv(`입주민메모_${todayStr()}.csv`, rows);
+}
+
 function renderDash(){
   renderBookingHealth();
+  renderMemos();
   const c = counts();
   const total = activeUnits().length;
   const done = c.done||0;
@@ -1767,22 +1954,35 @@ function renderWorksheet(){
   const boxCols = (arr) =>
     `<div class="eq-h">${arr.map(()=>'<span class="eq-c eq-b">☐</span>').join('')}</div>`;
 
+  // 열 개수 — 메모 줄을 가로로 붙일 때 씁니다
+  const nCols = 7 + (showPersonal ? 2 : 0);
+
   const rows = list.map(u=>{
     const pinCell = isHotel(u.presence)
       ? '<strong style="white-space:nowrap">🏨 11시 이후 개방시</strong>'
       : hasPin(u.presence)
         ? (u.pin ? `<strong>${esc(u.pin)}</strong>` : '<span style="color:#ef4444">비번 미입력</span>')
         : (PRESENCE[u.presence]||'—');
-    return `<tr>
-      <td class="nw" style="font-weight:800;font-size:1.15em">${esc(u.ho)}</td>
-      <td class="nw">${esc(slotLabel(date,u.slot)||'미정')}</td>
-      ${showPersonal ? `<td class="nw">${esc(nameOf(u))}</td><td class="nw">${esc(phoneOf(u))}</td>` : ''}
-      <td>${pinCell}</td>
-      <td class="nw">${esc(u.tech||'')}</td>
-      <td class="eqd">${boxCols(EQUIP_RET)}</td>
-      <td class="eqd">${boxCols(EQUIP_INS)}</td>
-      <td class="eqd"><div class="eq-h"><span class="eq-c eq-b">☐</span></div></td>
-    </tr>`;
+    /* 입주민이 남긴 요청은 기사에게도 보여줍니다.
+       "셋톱박스가 안방에 있습니다", "벨이 고장났습니다" 처럼 현장에서 바로 필요한 내용입니다.
+       (이름·연락처가 아니므로 기사 계정에서도 그대로 나옵니다) */
+    const memos = residentNotes(u);
+    const memoRow = memos.length ? `<tr class="ws-memo"><td colspan="${nCols}">
+        <span class="ws-memo-tag">요청</span>${memos.map(t=>esc(t)).join(' / ')}
+      </td></tr>` : '';
+    // 세대와 그 요청이 인쇄 중 갈라지지 않도록 한 덩어리로 묶습니다
+    return `<tbody class="ws-row">
+      <tr>
+        <td class="nw" style="font-weight:800;font-size:1.15em">${esc(u.ho)}</td>
+        <td class="nw">${esc(slotLabel(date,u.slot)||'미정')}</td>
+        ${showPersonal ? `<td class="nw">${esc(nameOf(u))}</td><td class="nw">${esc(phoneOf(u))}</td>` : ''}
+        <td>${pinCell}</td>
+        <td class="nw">${esc(u.tech||'')}</td>
+        <td class="eqd">${boxCols(EQUIP_RET)}</td>
+        <td class="eqd">${boxCols(EQUIP_INS)}</td>
+        <td class="eqd"><div class="eq-h"><span class="eq-c eq-b">☐</span></div></td>
+      </tr>${memoRow}
+    </tbody>`;
   }).join('');
 
   $('wsBody').innerHTML = `
@@ -1796,7 +1996,7 @@ function renderWorksheet(){
             <th class="eqh">설치${headCols(EQUIP_INS)}</th>
             <th class="eqh">확인</th>
           </tr></thead>
-          <tbody>${rows}</tbody>
+          ${rows}
         </table>
       </div>
       <div style="padding:9px 12px;font-size:13.2px;color:var(--muted);line-height:1.6">
