@@ -1730,15 +1730,19 @@ function fillSlotSelect(dateStr, cur){
   const sel = $('umSlot');
   if(!dateStr){ sel.innerHTML = '<option value="">— 날짜 먼저 —</option>'; return; }
   const list = slotsForDate(dateStr);
+  const pendCounts = availCounts();
   const uNow = units.find(x=>x.id===editingUnitId);
   const hotel = uNow && isHotel(segValue('umPresence') || uNow.presence);
   sel.innerHTML = '<option value="">— 미정 —</option>' + list.map(s=>{
-    // 이 세대를 포함한 실제 배정 인원 (일정 화면과 같은 숫자가 나오도록)
-    const others = units.filter(u=>u.date===dateStr && u.slot===s.id && u.id!==editingUnitId).length;
+    // 이 세대를 포함한 실제 배정 인원 (아직 못 옮긴 입주민 예약까지 셉니다)
+    const mineCounted = (uNow && uNow.date===dateStr && uNow.slot===s.id) ? 1 : 0;
+    const others = Math.max(
+      units.filter(u=>u.date===dateStr && u.slot===s.id && u.id!==editingUnitId).length,
+      (pendCounts[dateStr+'|'+s.id] || 0) - mineCounted);
     const mineHere = cur===s.id;
     const n = others + (mineHere ? 1 : 0);
     const cap = Number(s.cap)||0;
-    const full = !mineHere && cap && others >= cap;
+    const full = !mineHere && (cap <= 0 || others >= cap);   // 정원 0 = 받지 않음
     const tooEarly = hotel && !slotOkForHotel(s);
     return `<option value="${s.id}" ${mineHere?'selected':''}>${s.from}~${s.to} (${n}/${cap})`
          + `${full?' 정원초과':''}${tooEarly?' ⚠ 체크아웃 전':''}</option>`;
@@ -1949,10 +1953,14 @@ function bulkAssign(){
 
   if(!targets.length) return toast('배정할 세대가 없습니다');
 
+  /* 자리 수는 '예약함에 들어왔지만 아직 세대에 옮겨지지 않은 건'까지 세어야 합니다.
+     세대 목록만 세면, 방금 들어온 입주민 예약을 모른 채 배정해 정원을 넘깁니다. */
+  const pend = availCounts();
   let assigned = 0;
   for(const s of slots){
     const capN = Number(s.cap)||0;
-    let cur = units.filter(u=>u.date===date && u.slot===s.id).length;
+    let cur = Math.max(units.filter(u=>u.date===date && u.slot===s.id).length,
+                       pend[date+'|'+s.id] || 0);
     while(cur < capN && targets.length){
       // 호텔 호실은 체크아웃(11시) 이전 시간대에 넣지 않습니다
       const idx = slotOkForHotel(s) ? 0 : targets.findIndex(u=>!isHotel(u.presence));
@@ -3356,8 +3364,28 @@ function subscribeCloud(){
 
       const i = units.findIndex(u=>u.id===ch.doc.id);
       if(i<0) units.push(markServerState(normalizeUnit(d)));
-      else if((d.updatedAt||0) >= (units[i].updatedAt||0)) units[i] = markServerState(normalizeUnit(d));
-      else markServerState(units[i]);   // 서버가 옛것이어도 기준점은 갱신
+      else if((d.updatedAt||0) >= (units[i].updatedAt||0)){
+        /* 세대 자료를 서버 것으로 갈아끼울 때, 기기 안에서만 쓰는 표시는 지켜야 합니다.
+           ─ bkSig 는 '이 예약은 이미 반영했다'는 표시입니다. 이게 지워지면 앱이 같은
+             예약을 새 것으로 착각해 다시 반영하고, 그때 진행상태를 예약확정으로
+             되돌립니다. 부재·재방문으로 바꿔둔 세대가 몇 초 뒤 되돌아가던 원인입니다.
+           ─ bookingId 는 사무소가 일정을 옮길 때 되돌려 쓸 주소입니다. */
+        const keep = { bkSig: units[i].bkSig, bookingId: units[i].bookingId };
+        units[i] = markServerState(normalizeUnit(d));
+        if(keep.bkSig)     units[i].bkSig     = keep.bkSig;
+        if(keep.bookingId) units[i].bookingId = keep.bookingId;
+      }
+      else {
+        /* 서버 것이 더 오래됐으면 기기 값을 그대로 둡니다.
+           단 '서버에 저장된 상태'는 반드시 서버 문서 그대로 기억해야 합니다.
+           ─ 예전에는 여기서 기기 값을 기준점으로 잡았습니다. 그러면 방금 고쳐놓고
+             아직 못 올린 내용이 '이미 올라간 것'으로 오인되어, 바뀐 항목만 골라
+             보내는 규칙에 걸러져 영영 전송되지 않았습니다.
+             (부재·재방문으로 바꾼 세대가 몇 초 뒤 예약확정으로 되돌아가던 원인입니다) */
+        const base = normalizeUnit(JSON.parse(JSON.stringify(d)));
+        delete base._srv;
+        units[i]._srv = base;
+      }
       if(hadPersonal) legacy.push(ch.doc.id);
     });
     cloudApplying = false;
@@ -3490,7 +3518,14 @@ function applyBookingInner(b, docId){
   /* 이미 작업이 끝난 세대에 예약이 들어오면 일정은 건드리지 않되,
      조용히 버리지 않고 소장님께 알립니다 (재작업 요청일 수 있습니다) */
   if(u.status==='done'){
-    if(!b.cancelled) flagBooking('late', b, sig);
+    /* 그 예약대로 작업을 마친 경우까지 「완료 뒤 예약」으로 알리면 안 됩니다.
+       기기를 새로 켜면 지문이 없어 지난 예약을 전부 다시 훑는데, 그때
+       이미 끝난 세대 수백 건이 한꺼번에 경고로 쏟아졌습니다.
+       내용이 세대에 적힌 일정과 같으면 조용히 지문만 남깁니다. */
+    const same = b.cancelled ? (!u.date && !u.slot)
+                             : (u.date === (b.date||'') && u.slot === (b.slot||''));
+    if(!b.cancelled && !same){ flagBooking('late', b, sig); return false; }
+    u.bkSig = sig; saveLocal();
     return false;
   }
 
@@ -3836,6 +3871,9 @@ async function publishPublic(force){
       slots: config.slots,
       // 호텔 운영 호실 — 입주민 예약 페이지에서 신청을 막습니다(사무소가 직접 조율)
       hotelHos: units.filter(u=>isHotel(u.presence)).map(u=>String(u.ho)).sort(),
+      /* 교체가 끝난 호실 — 2차 일정을 새로 열었을 때, 이미 끝난 세대가 또 예약해
+         남은 세대의 자리를 차지하고 그날 헛되이 기다리는 일을 막습니다. */
+      doneHos: units.filter(u=>u.status==='done').map(u=>String(u.ho)).sort(),
     };
     /* ── 입주민 예약 페이지가 보는 공개정보(작업일·시간대·정원) ──
        ⚠ 관리자만 올립니다.
