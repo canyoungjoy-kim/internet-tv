@@ -205,6 +205,13 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 .memo-item{padding:11px 13px;border-bottom:1px solid var(--border);cursor:pointer}
 .memo-item:last-child{border-bottom:none}
 .memo-item:active{background:#f8fafc}
+.memo-go{margin-left:auto;font-size:14.4px;font-weight:800;color:var(--primary)}
+#dMemoSec:active{background:#f8fafc}
+/* 아래 탭의 교체 전 건수 표시 */
+.nav-item{position:relative}
+.nav-dot{position:absolute;top:3px;left:50%;margin-left:7px;min-width:18px;height:18px;
+  padding:0 5px;border-radius:9px;background:var(--red);color:#fff;font-size:11.5px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;line-height:1}
 .memo-item.picked{background:#eff6ff}
 .memo-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .memo-chk{width:26px;height:26px;border-radius:7px;border:2px solid #cbd5e1;background:#fff;
@@ -311,14 +318,12 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
         <div id="dAlerts"></div>
       </div>
 
-      <!-- 입주민이 예약할 때 남긴 요청 메모 -->
-      <div class="sec" id="dMemoSec">
+      <!-- 입주민 요청 메모 — 요약만. 자세한 내용은 '메모' 탭 -->
+      <div class="sec" id="dMemoSec" onclick="switchView('memo')" style="cursor:pointer">
         <div class="sec-title">
           📝 입주민 요청 메모 <span id="dMemoCount"></span>
-          <button class="btn btn-outline btn-sm no-print" id="dMemoFilter" onclick="toggleMemoFilter()">미완료만</button>
+          <span class="memo-go no-print">자세히 ›</span>
         </div>
-        <div id="dMemo"></div>
-        <div class="sec-body no-print" id="dMemoBtns" style="padding-top:0"></div>
       </div>
 
       <div class="sec">
@@ -342,6 +347,18 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
       </div>
       <div class="legend" id="uLegend"></div>
       <div id="uBody"></div>
+    </div>
+
+    <!-- ══════════ 입주민 메모 ══════════ -->
+    <div class="view" id="v-memo">
+      <div class="sec">
+        <div class="sec-title">
+          📝 입주민 요청 메모 <span id="mMemoCount"></span>
+          <button class="btn btn-outline btn-sm no-print" id="dMemoFilter" onclick="toggleMemoFilter()">교체 전만</button>
+        </div>
+        <div id="dMemo"></div>
+        <div class="sec-body no-print" id="dMemoBtns" style="padding-top:0"></div>
+      </div>
     </div>
 
     <!-- ══════════ 일정 ══════════ -->
@@ -589,6 +606,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
   <nav>
     <button class="nav-item active" data-v="dash" onclick="switchView('dash')"><span class="ico">📊</span>대시보드</button>
     <button class="nav-item" data-v="units" onclick="switchView('units')"><span class="ico">🏢</span>세대</button>
+    <button class="nav-item" data-v="memo" onclick="switchView('memo')"><span class="ico">📝</span>세대메모<span class="nav-dot" id="navMemoDot"></span></button>
     <button class="nav-item" data-v="sched" onclick="switchView('sched')"><span class="ico">📅</span>일정</button>
     <button class="nav-item" data-v="tech" onclick="switchView('tech')"><span class="ico">🧾</span>작업요청</button>
     <button class="nav-item" data-v="stats" onclick="switchView('stats')"><span class="ico">📈</span>통계</button>
@@ -969,6 +987,7 @@ function switchView(v){
   applyRoleUI();
   if(v==='dash') renderDash();
   if(v==='units') renderUnits();
+  if(v==='memo')  renderMemos();
   if(v==='sched') renderSched();
   if(v==='tech') renderTechView();
   if(v==='stats') renderStats();
@@ -995,10 +1014,13 @@ function renderAll(){
   const v = active ? active.id.replace('v-','') : 'dash';
   if(v==='dash') renderDash();
   else if(v==='units') renderUnits();
+  else if(v==='memo') renderMemos();
   else if(v==='sched') renderSched();
   else if(v==='tech') renderTechView();
   else if(v==='stats') renderStats();
   else if(v==='settings') renderSettings();
+  // 아래 탭의 교체 전 배지는 어느 화면에 있든 항상 최신으로
+  renderMemoSummary();
 }
 
 /* ═══════════════════════════════════════════
@@ -1078,7 +1100,7 @@ function memoUnits(){
               .sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999')
                         || sortBySlotThenHo(a,b));
 }
-let memoOnlyOpen = false;    // 미완료만 보기
+let memoOnlyOpen = false;    // 아직 장비교체가 끝나지 않은 세대만 보기
 function toggleMemoFilter(){ memoOnlyOpen = !memoOnlyOpen; renderMemos(); }
 
 /* 호실 선택 — 고른 세대만 뽑아 쓸 수 있게 합니다.
@@ -1107,25 +1129,44 @@ function memoPickAll(){
 }
 function memoClearPick(){ memoSel.clear(); renderMemos(); }
 
+/* 대시보드에는 건수만, 자세한 내용은 '세대메모' 탭에서 봅니다 */
+function memoCountHtml(){
+  const all = memoUnits();
+  const open = all.filter(u=>u.status!=='done').length;
+  if(!all.length) return `<span style="color:var(--muted);font-weight:700">없음</span>`;
+  return `<span style="color:var(--text)">${all.length}건</span>`
+       + (open ? ` <span style="color:var(--red)">· 교체 전 ${open}</span>` : '');
+}
+function renderMemoSummary(){
+  const c = $('dMemoCount');
+  if(c) c.innerHTML = memoCountHtml();
+  const dot = $('navMemoDot');
+  if(dot){
+    const open = memoUnits().filter(u=>u.status!=='done').length;
+    dot.textContent = open > 99 ? '99+' : String(open);
+    dot.style.display = open ? '' : 'none';
+  }
+}
+
 function renderMemos(){
   const box = $('dMemo'); if(!box) return;
   const all = memoUnits();
   const list = memoOnlyOpen ? all.filter(u=>u.status!=='done') : all;
   const open = all.filter(u=>u.status!=='done').length;
 
-  $('dMemoCount').innerHTML = all.length
-    ? `<span style="color:var(--text)">${all.length}건</span>` +
-      (open ? ` <span style="color:var(--red)">· 미완료 ${open}</span>` : '')
-    : '';
+  const cnt = $('mMemoCount');
+  if(cnt) cnt.innerHTML = memoCountHtml();
+  renderMemoSummary();
   const fb = $('dMemoFilter');
   if(fb){
-    fb.textContent = memoOnlyOpen ? '전체 보기' : '미완료만';
+    fb.textContent = memoOnlyOpen ? '전체 보기' : '교체 전만';
     fb.style.display = all.length ? '' : 'none';
   }
 
   if(!list.length){
     box.innerHTML = `<div class="empty" style="padding:22px"><p>${
-      all.length ? '미완료인 요청이 없습니다' : '입주민이 남긴 메모가 아직 없습니다'}</p></div>`;
+      all.length ? '교체 전인 세대가 없습니다 · 메모를 남긴 세대는 모두 작업이 끝났습니다'
+                 : '입주민이 남긴 메모가 아직 없습니다'}</p></div>`;
     $('dMemoBtns').innerHTML = '';
     return;
   }
@@ -1205,7 +1246,7 @@ function exportMemoCsv(){
 
 function renderDash(){
   renderBookingHealth();
-  renderMemos();
+  renderMemoSummary();
   const c = counts();
   const total = activeUnits().length;
   const done = c.done||0;
