@@ -1779,8 +1779,12 @@ function saveUnitModal(){
   if(!u) return closeUnitModal();
   // 관리자만 고칠 수 있는 항목 (직원·기사 화면에서는 잠겨 있음)
   if(isAdmin()){
+    const oldP4 = ctOf(u).phone4 || '';
     setContact(u.ho, $('umName').value.trim(), $('umPhone').value.trim());
     pushContact(u.ho);
+    const newP4 = ctOf(u).phone4 || '';
+    // 번호가 바뀌었으면 이미 들어온 예약도 새 번호로 옮겨 둡니다
+    if(oldP4 !== newP4) migrateBooking(u, oldP4, newP4);
     u.presence = segValue('umPresence');
     u.pin = hasPin(u.presence) ? ($('umPin')?$('umPin').value.trim():'') : '';
     u.date = $('umDate').value;
@@ -2258,7 +2262,8 @@ function openPlanDoc(){
   .cover{text-align:center;padding:60px 20px 50px;border-bottom:3px solid #0f766e}
   .cover .sub{font-size:15px;color:#475569;margin-top:10px}
   .meta{margin-top:26px;font-size:14px;color:#334155}
-  table.t{width:100%;border-collapse:collapse;margin:8px 0 14px;font-size:13.5px}
+  table.t{width:100%;max-width:100%;border-collapse:collapse;margin:8px 0 14px;font-size:13.5px}
+  table.t td,table.t th{overflow-wrap:anywhere}
   table.t th,table.t td{border:1px solid #94a3b8;padding:6px 8px;text-align:left}
   table.t th{background:#f1f5f9;font-weight:800}
   table.t th.dh{background:#0f766e;color:#fff;font-size:14.5px;text-align:center}
@@ -2567,16 +2572,16 @@ function planSampleWorksheet(date){
     { ho:'305', si:1, pin:'재실',         tech:'이○○' },
     { ho:'603', si:2, pin:'🏨 11시 이후 개방시', tech:'이○○' },
   ];
-  const head = (arr)=>`<div style="display:flex;justify-content:center;gap:6px;margin-top:3px;white-space:nowrap">
-      ${arr.map(e=>`<span style="display:inline-block;min-width:3.4em;text-align:center;font-weight:700">${EQUIP_SHORT[e.key]||e.label}</span>`).join('')}</div>`;
-  const boxes = (arr)=>`<div style="display:flex;justify-content:center;gap:6px;white-space:nowrap">
-      ${arr.map(()=>'<span style="display:inline-block;min-width:3.4em;text-align:center;font-size:1.15em">☐</span>').join('')}</div>`;
+  const head = (arr)=>`<div style="display:flex;justify-content:center;gap:3px;margin-top:3px;white-space:nowrap">
+      ${arr.map(e=>`<span style="display:inline-block;min-width:2.9em;text-align:center;font-weight:700">${EQUIP_SHORT[e.key]||e.label}</span>`).join('')}</div>`;
+  const boxes = (arr)=>`<div style="display:flex;justify-content:center;gap:3px;white-space:nowrap">
+      ${arr.map(()=>'<span style="display:inline-block;min-width:2.9em;text-align:center;font-size:1.15em">☐</span>').join('')}</div>`;
   const rows = sample.map(r=>{
     const s = ss[r.si] || {};
     return `<tr>
       <td style="font-weight:800;white-space:nowrap">${r.ho}</td>
       <td class="n" style="white-space:nowrap">${hhmm(s.from)}~${hhmm(s.to)}</td>
-      <td class="n" style="white-space:nowrap">${esc(r.pin)}</td>
+      <td class="n">${esc(r.pin)}</td>
       <td class="n" style="white-space:nowrap">${r.tech}</td>
       <td>${boxes(EQUIP_RET)}</td>
       <td>${boxes(EQUIP_INS)}</td>
@@ -2885,7 +2890,23 @@ function importCsv(ev){
       const iNote = find(['비고','메모']);
       if(iHo<0) { ev.target.value=''; return alert('머리글에서 "호실" 열을 찾지 못했습니다.\n첫 줄에 호실/이름/연락처 같은 열 이름이 있어야 합니다.'); }
 
-      let updated=0, created=0, skipped=0;
+      /* 없던 호실이 나오면 먼저 여쭙습니다.
+         다른 건물 명단이나 잘못된 파일을 올렸을 때 세대가 조용히 늘어나던 것을 막습니다. */
+      const newHos = [];
+      for(let r=1;r<rows.length;r++){
+        const h = String(rows[r][iHo]||'').trim().replace(/호\s*$/,'');
+        if(h && !units.find(x=>String(x.ho)===h)) newHos.push(h);
+      }
+      let allowNew = true;
+      if(newHos.length){
+        allowNew = confirm(
+          `명단에 지금 없는 호실이 ${newHos.length}개 있습니다.\n\n`
+          + newHos.slice(0,12).join(', ') + (newHos.length>12 ? ' …' : '')
+          + `\n\n[확인] 새 세대로 추가합니다\n[취소] 추가하지 않고, 이미 있는 세대만 갱신합니다\n\n`
+          + `※ 다른 건물 명단을 잘못 올리신 것은 아닌지 확인해 주세요.`);
+      }
+
+      let updated=0, created=0, skipped=0, ignoredNew=0;
       for(let r=1;r<rows.length;r++){
         const ho = String(rows[r][iHo]||'').trim().replace(/호\s*$/,'');
         if(!ho) { skipped++; continue; }
@@ -2894,12 +2915,19 @@ function importCsv(ev){
         const note = iNote>=0 ? String(rows[r][iNote]||'').trim() : '';
         let u = units.find(x=>String(x.ho)===ho);
         if(u){
+          const oldP4 = ctOf(u).phone4 || '';
           if(name) setContact(u.ho, name, undefined);
           if(phone) setContact(u.ho, undefined, phone);
           if(name||phone) pushContact(u.ho);
-          if(note) u.note = u.note ? u.note+' / '+note : note;
+          const newP4 = ctOf(u).phone4 || '';
+          /* 번호가 바뀌면 이미 들어온 예약도 새 번호로 옮깁니다.
+             안 옮기면 입주민이 새 번호로 조회했을 때 자기 예약을 못 찾습니다. */
+          if(oldP4 !== newP4) migrateBooking(u, oldP4, newP4);
+          // 같은 명단을 여러 번 올려도 비고가 겹겹이 쌓이지 않게
+          if(note && !(u.note||'').includes(note)) u.note = u.note ? u.note+' / '+note : note;
           u.updatedAt=Date.now(); pushUnit(u); updated++;
-        } else {
+        } else if(!allowNew){ ignoredNew++; continue; }
+        else {
           const floor = Number(String(ho).slice(0, String(ho).length-2)) || 0;
           if(!floor){ skipped++; continue; }
           u = normalizeUnit({ id:ho, ho, floor, note, status:'todo', presence:'', date:'', slot:'', tech:'', pin:'', updatedAt:Date.now() });
@@ -2908,7 +2936,8 @@ function importCsv(ev){
         }
       }
       saveLocal(); renderAll();
-      alert(`불러오기 완료\n\n수정 ${updated}세대\n신규 ${created}세대${skipped?`\n건너뜀 ${skipped}줄`:''}`);
+      alert(`불러오기 완료\n\n수정 ${updated}세대\n신규 ${created}세대`
+        + (ignoredNew?`\n추가하지 않음 ${ignoredNew}세대`:'') + (skipped?`\n건너뜀 ${skipped}줄`:''));
     }catch(err){
       console.error(err); alert('CSV 읽기 실패: '+err.message);
     }
@@ -2987,33 +3016,65 @@ function saveConfigFromForm(){
   saveLocal(); pushConfig();
   toast(config.bookingOpen ? '입주민 예약 접수를 열었습니다' : '입주민 예약 접수를 닫았습니다');
 }
-function setDay(i,v){ config.days[i].date=v; config.updatedAt=Date.now(); saveLocal(); pushConfig(); renderSettings(); }
+function setDay(i,v){ config.days[i].date=v; config.updatedAt=Date.now(); saveLocal(); pushConfig(); resetSlotCounters(); renderSettings(); }
 function delDay(i){
   const d = config.days[i];
-  const n = units.filter(u=>u.date===d.date).length;
-  if(n && !confirm(`${fmtDate(d.date)} 에 ${n}세대가 예약되어 있습니다.\n삭제하면 그 세대들의 예약이 해제됩니다. 계속할까요?`)) return;
-  units.forEach(u=>{ if(u.date===d.date){ u.date=''; u.slot=''; if(u.status==='booked') u.status='todo'; u.updatedAt=Date.now(); pushUnit(u); } });
+  const list = units.filter(u=>u.date===d.date);
+  if(list.length && !confirm(
+      `${fmtDate(d.date)} 에 ${list.length}세대가 잡혀 있습니다.\n\n삭제하면 그 세대의 예약이 해제되고,\n입주민이 넣은 예약도 함께 취소됩니다.\n(입주민에게는 따로 안내가 가지 않습니다)\n\n삭제 후 「미예약 세대」 목록에서 연락처를 뽑아 안내해 주세요.\n\n계속할까요?`)) return;
+  releaseUnits(list, `${fmtDate(d.date)} 작업일 삭제로 예약 해제`);
   config.days.splice(i,1); config.updatedAt=Date.now();
-  saveLocal(); pushConfig(); renderSettings();
+  saveLocal(); pushConfig(); resetSlotCounters(); renderSettings();
 }
 function addWorkDay(){ config.days.push({date:'',note:''}); config.updatedAt=Date.now(); saveLocal(); renderSettings(); }
+/* 작업일·시간대·정원을 고치면 잔여석 카운터를 통째로 다시 맞춥니다.
+   ─ 예전에는 '지난번에 올린 값과 같으면 건너뛰기' 때문에, 일정을 고친 뒤에도
+     옛 숫자가 서버에 그대로 남았습니다. 그러면 이미 꽉 찬 시간대가 입주민 화면에
+     「예약 가능」으로 보여 정원을 넘겨 예약이 들어옵니다. */
+function resetSlotCounters(){
+  lastPub.slots = {};
+  publishDirty = true;
+  schedulePublish();
+}
 function setSlot(kind,i,field,v){
   config.slots[kind][i][field] = field==='cap' ? (Number(v)||0) : v;
-  config.updatedAt=Date.now(); saveLocal(); pushConfig(); renderSettings();
+  config.updatedAt=Date.now(); saveLocal(); pushConfig(); resetSlotCounters(); renderSettings();
 }
+/* 일정을 지워 예약이 풀린 세대를 소장님이 반드시 찾을 수 있게 합니다.
+   ─ 예전에는 시간만 지우고 날짜를 남겨서, 「예약확정인데 시간이 없는」 세대가 생겼습니다.
+     그 세대는 일정표에도, 작업요청서에도, 미예약 목록에도 나오지 않아
+     소장님이 찾을 방법이 없었습니다. 입주민 예약도 함께 취소되는데 안내도 없었고요.
+   ─ 이제 작업일 삭제와 똑같이 완전히 되돌리고, 사유를 메모에 남깁니다.
+     그러면 「미예약 세대」 목록에 잡혀 독촉 문자 대상이 됩니다. */
+function releaseUnits(list, reason){
+  list.forEach(u=>{
+    u.date=''; u.slot='';
+    if(u.status==='booked') u.status='todo';
+    appendNote(u, '[사무소] ' + reason);
+    u.updatedAt=Date.now(); pushUnit(u);
+  });
+  if(!list.length) return;
+  const hos = list.map(u=>String(u.ho));
+  releasedHos = hos.slice();
+  toast(`⚠️ ${hos.length}세대의 예약이 해제되었습니다 — 통계 탭 「미예약 세대」에서 연락처를 뽑아 안내해 주세요`, 12000);
+  console.info('예약 해제', reason, hos.join(', '));
+}
+let releasedHos = [];
+
 function delSlot(kind,i){
   const s = config.slots[kind][i];
-  const n = units.filter(u=>u.slot===s.id).length;
-  if(n && !confirm(`이 시간대에 ${n}세대가 배정되어 있습니다. 삭제하면 시간이 미정으로 바뀝니다. 계속할까요?`)) return;
-  units.forEach(u=>{ if(u.slot===s.id){ u.slot=''; u.updatedAt=Date.now(); pushUnit(u); } });
+  const list = units.filter(u=>u.slot===s.id && u.date);
+  if(list.length && !confirm(
+      `이 시간대에 ${list.length}세대가 잡혀 있습니다.\n\n삭제하면 그 세대의 예약이 해제되고,\n입주민이 넣은 예약도 함께 취소됩니다.\n(입주민에게는 따로 안내가 가지 않습니다)\n\n삭제 후 「미예약 세대」 목록에서 연락처를 뽑아 안내해 주세요.\n\n계속할까요?`)) return;
+  releaseUnits(list, `${s.from}~${s.to} 시간대 삭제로 예약 해제`);
   config.slots[kind].splice(i,1); config.updatedAt=Date.now();
-  saveLocal(); pushConfig(); renderSettings();
+  saveLocal(); pushConfig(); resetSlotCounters(); renderSettings();
 }
 function addSlot(kind){
   const pre = { weekday:'w', sat:'s', sun:'u' }[kind] || 'x';
   const id = pre + Date.now().toString(36).slice(-4);
   config.slots[kind].push({ id, from:'09:00', to:'11:00', cap:10 });
-  config.updatedAt=Date.now(); saveLocal(); pushConfig(); renderSettings();
+  config.updatedAt=Date.now(); saveLocal(); pushConfig(); resetSlotCounters(); renderSettings();
 }
 function setFR(i,f,v){ config.floorRules[i][f]=Number(v)||0; config.updatedAt=Date.now(); saveLocal(); pushConfig(); renderSettings(); }
 function delFR(i){ config.floorRules.splice(i,1); config.updatedAt=Date.now(); saveLocal(); pushConfig(); renderSettings(); }
@@ -3417,7 +3478,13 @@ function subscribeCloud(){
   unsubConfig = onSnapshot(doc(firebaseDB,'sites',SITE_ID,'meta','config'), snap=>{
     if(!snap.exists()){ pushConfig(); return; }
     const d = snap.data();
-    if((d.updatedAt||0) > (config.updatedAt||0)){
+    /* 설정은 통째로 덮어쓰는 값이라, 두 기기가 거의 동시에 바꾸면
+       서로 자기 것만 붙들고 영영 갈라섭니다(작업일·정원이 기기마다 달라짐).
+       '내가 올린 것과 서버의 것이 다르다'면 다른 기기가 나중에 덮어쓴 것이므로
+       서버 쪽을 따릅니다 — 서버를 한 벌의 정답으로 삼습니다. */
+    const overwritten = lastConfigPush !== null && (d.updatedAt||0) !== lastConfigPush;
+    if((d.updatedAt||0) > (config.updatedAt||0) || overwritten){
+      lastConfigPush = d.updatedAt || 0;
       config = Object.assign(defaultConfig(), d);
       if(config.slots && config.slots.weekend){   // 옛 형식이면 변환 후 다시 올림
         migrateSlots(config, units);
@@ -3442,7 +3509,13 @@ function subscribeCloud(){
     let n = 0;
     snap.docChanges().forEach(ch=>{
       const d = ch.doc.data();
-      if(ch.type==='removed'){ if(d && d.ho) bookingIndex.delete(String(d.ho)); return; }
+      if(ch.type==='removed'){
+        /* 호실만 보고 지우면 안 됩니다. 연락처가 바뀌어 예약을 새 문서로 옮긴 직후
+           옛 문서가 지워지는데, 그때 방금 옮겨둔 새 예약까지 같이 날아갑니다.
+           지워진 그 문서를 들고 있을 때만 지웁니다. */
+        bookingIndex.forEach((v,k)=>{ if(v.id === ch.doc.id) bookingIndex.delete(k); });
+        return;
+      }
       if(!d || !d.ho) return;
       /* 예약 원본을 통째로 들고 있습니다.
          세대 목록이 아직 안 왔거나 잠시 저장이 막혀 반영에 실패해도,
@@ -3671,6 +3744,35 @@ async function pushBookingUpdate(u, before){
   }
 }
 
+/* 연락처를 고치면 예약 문서도 새 뒷 4자리로 옮깁니다.
+   예약 문서 이름이 '호실_뒷4자리' 라서, 번호만 바꾸면 입주민이 새 번호로 조회했을 때
+   자기 예약을 못 찾습니다. 그러면 없는 줄 알고 다시 예약해 한 세대가 두 자리를
+   차지하게 됩니다. 사무소가 번호를 고치는 순간 예약도 함께 옮겨 둡니다. */
+async function migrateBooking(u, oldP4, newP4){
+  if(!firebaseDB || !cloudUser || !canSeeBookings()) return;
+  const ho = String(u.ho);
+  const cur = bookingIndex.get(ho);
+  if(!cur || cur.cancelled || !cur.date || !cur.slot) return;
+  const oldId = cur.id || `${ho}_${oldP4 || '0000'}`;
+  const newId = `${ho}_${newP4 || '0000'}`;
+  if(oldId === newId) return;
+  try{
+    const { doc, setDoc, deleteDoc } = window._fb;
+    const moved = Object.assign({}, cur, { phone4: newP4 || '0000', byOffice:true, at: Date.now() });
+    delete moved.id;
+    await setDoc(doc(firebaseDB,'sites',SITE_ID,'bookings', newId), moved);
+    await deleteDoc(doc(firebaseDB,'sites',SITE_ID,'bookings', oldId));
+    u.bookingId = newId;
+    u.bkSig = bookingSig(moved);
+    bookingIndex.set(ho, Object.assign({}, moved, { id:newId }));
+    saveLocal();
+    toast(`📇 ${ho}호 예약을 새 연락처로 옮겼습니다`, 4500);
+  }catch(e){
+    console.error('예약 이전 실패', ho, e);
+    toast(`⚠️ ${ho}호 예약을 새 연락처로 옮기지 못했습니다 — 입주민이 예약을 조회하지 못할 수 있습니다`, 9000);
+  }
+}
+
 /* 서버 규칙이 허용하는 항목 — 규칙(RULES_TEXT)과 반드시 같아야 합니다.
    관리자가 아닌 계정이 문서 전체를 올리면 규칙에 걸려 저장이 통째로 거부됩니다.
    그래서 역할별로 보낼 항목을 미리 걸러 냅니다. */
@@ -3799,11 +3901,13 @@ async function deleteUnitCloud(id){
     await deleteDoc(doc(firebaseDB,'sites',SITE_ID,'units',id));
   }catch(e){ console.error(e); }
 }
+let lastConfigPush = null;     // 우리가 마지막으로 올린 설정의 시각
 async function pushConfig(){
   if(!firebaseDB || !cloudUser) return;
   try{
     const { doc, setDoc } = window._fb;
     await setDoc(doc(firebaseDB,'sites',SITE_ID,'meta','config'), JSON.parse(JSON.stringify(config)));
+    lastConfigPush = config.updatedAt || 0;
     schedulePublish();
   }catch(e){ console.error(e); }
 }
@@ -4007,6 +4111,23 @@ async function forceSync(){
       console.error('예약함 동기화', e);
     }
   }
+
+  /* 설정(작업일·시간대·정원)은 서버 것을 그대로 받아옵니다.
+     두 기기에서 거의 동시에 설정을 바꾸면 서로 자기 값만 붙들 수 있는데,
+     「동기화」를 누르면 언제나 서버 기준 한 벌로 맞춰집니다. */
+  try{
+    const { doc, getDoc } = window._fb;
+    const cs = await getDoc(doc(firebaseDB,'sites',SITE_ID,'meta','config'));
+    if(cs.exists()){
+      const d = cs.data();
+      if(JSON.stringify(d) !== JSON.stringify(config)){
+        config = Object.assign(defaultConfig(), d);
+        lastConfigPush = d.updatedAt || 0;
+        lastPub.slots = {};
+        toast('설정을 서버 기준으로 맞췄습니다', 3500);
+      }
+    }
+  }catch(e){ fails.push('설정'); console.error('설정 동기화', e); }
 
   if(canPublish()){
     try{ await publishPublic(true); }      // 수동 동기화는 무조건 다시 올림
