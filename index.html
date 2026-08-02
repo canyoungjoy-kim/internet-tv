@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="장비교체">
 <link rel="manifest" href="manifest.json">
 <title>인터넷·TV 장비교체 관리</title>
+<script src="fbconfig.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -937,10 +938,18 @@ function loadLocal(){
   if(!config.days) config.days = defaultConfig().days;
   if(!config.techs) config.techs = [];
   if(!config.floorRules) config.floorRules = defaultConfig().floorRules;
+  /* 접속 설정은 이 기기에 저장된 값을 먼저 쓰고, 없으면 fbconfig.js 를 씁니다.
+     이게 없으면 직원·기사가 새 기기에서 열었을 때 「⚪ 미설정」만 뜨고
+     로그인 화면조차 나오지 않아, 기기마다 설정을 손으로 붙여넣어야 했습니다.
+     (입주민 예약 페이지는 처음부터 fbconfig.js 를 읽고 있었습니다) */
   try{
     const f = localStorage.getItem(LS_FB);
     fbConfig = f ? JSON.parse(f) : null;
   }catch(e){ fbConfig=null; }
+  if(!fbConfig || !fbConfig.apiKey){
+    const w = window.ITTV_FIREBASE_CONFIG;
+    if(w && w.apiKey && w.projectId) fbConfig = w;
+  }
   try{
     const ct = localStorage.getItem(LS_CONTACTS);
     contacts = ct ? JSON.parse(ct) : {};
