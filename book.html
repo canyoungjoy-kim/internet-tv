@@ -668,11 +668,16 @@ async function doSubmit(){
          지난 일자의 기록만 어긋납니다. */
       if(prev && isFinished(prev.date)) prev = null;
       const moving = prev && (prev.date !== sel.date || prev.slot !== sel.slot);
-      let oldRef = null, oldN = 0;
+      let oldRef = null, oldN = 0, oldCap = 0;
       if(moving){
         oldRef = doc(db,'sites',SITE_ID,'slots', slotKey(prev.date, prev.slot));
         const oldSnap = await tx.get(oldRef);
         oldN = oldSnap.exists() ? (oldSnap.data().n||0) : 0;
+        /* 정원은 서버에 있던 값을 그대로 되돌려 씁니다.
+           빼먹으면 규칙이 '정원을 건드렸다'고 보고 거부해, 예약 변경 자체가 막힙니다. */
+        oldCap = (oldSnap.exists() && oldSnap.data().cap !== undefined)
+                   ? oldSnap.data().cap
+                   : (Number((slotsFor(prev.date).find(x=>x.id===prev.slot)||{}).cap) || 0);
       }
 
       const n = newSnap.exists() ? (newSnap.data().n||0) : 0;
@@ -686,7 +691,7 @@ async function doSubmit(){
 
       if(!alreadyHere){
         tx.set(newRef, { date:sel.date, slot:sel.slot, cap, n:n+1, at:Date.now() });
-        if(oldRef) tx.set(oldRef, { date:prev.date, slot:prev.slot, n:Math.max(0, oldN-1), at:Date.now() });
+        if(oldRef) tx.set(oldRef, { date:prev.date, slot:prev.slot, cap:oldCap, n:Math.max(0, oldN-1), at:Date.now() });
       }
       tx.set(bkRef, {
         ho: sel.ho,
@@ -753,7 +758,11 @@ async function cancelBooking(){
       const bkRef   = doc(db,'sites',SITE_ID,'bookings', `${myBooking.ho}_${myBooking.phone4}`);
       const snap = await tx.get(slotRef);
       const n = snap.exists() ? (snap.data().n||0) : 0;
-      tx.set(slotRef, { date:myBooking.date, slot:myBooking.slot, n:Math.max(0,n-1), at:Date.now() });
+      /* 취소할 때도 정원을 그대로 실어 보냅니다 — 빼면 규칙이 거부해 취소가 안 됩니다 */
+      const capNow = (snap.exists() && snap.data().cap !== undefined)
+                       ? snap.data().cap
+                       : (Number((slotsFor(myBooking.date).find(x=>x.id===myBooking.slot)||{}).cap) || 0);
+      tx.set(slotRef, { date:myBooking.date, slot:myBooking.slot, cap:capNow, n:Math.max(0,n-1), at:Date.now() });
       tx.set(bkRef, { ho:myBooking.ho, phone4:myBooking.phone4, date:'', slot:'',
                       cancelled:true, at:Date.now() });
     });
