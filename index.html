@@ -227,6 +227,12 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 .memo-body{margin-top:5px;padding:9px 11px;background:#fffbeb;border-left:4px solid #fcd34d;
   border-radius:0 8px 8px 0;font-size:16.1px;font-weight:600;line-height:1.55;color:#78350f;
   white-space:pre-wrap;word-break:break-word}
+/* 관리소장 메모 — 입주민 메모(노란색)와 한눈에 구분되도록 청록 계열로 둡니다 */
+.memo-body.adm{background:#f0fdfa;border-left-color:#0d9488;color:#134e4a}
+.memo-body .adm-at{display:inline-block;margin-left:8px;font-size:12.6px;font-weight:700;color:#5b8f89}
+.memo-body .adm-act{display:inline-block;margin-left:8px}
+.memo-body .adm-act button{border:1px solid #99f6e4;background:#fff;color:#0f766e;border-radius:6px;
+  padding:2px 8px;font-size:12.6px;font-weight:700;cursor:pointer;margin-left:4px}
 #dMemoSec .sec-title{display:flex;align-items:center;gap:8px}
 #dMemoSec .sec-title button{margin-left:auto}
 
@@ -354,9 +360,10 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
     <div class="view" id="v-memo">
       <div class="sec">
         <div class="sec-title">
-          📝 입주민 요청 메모 <span id="mMemoCount"></span>
+          📝 세대메모 <span id="mMemoCount"></span>
           <button class="btn btn-outline btn-sm no-print" id="dMemoFilter" onclick="toggleMemoFilter()">교체 전만</button>
         </div>
+        <div class="sec-body no-print" id="dMemoKind" style="padding-bottom:0"></div>
         <div id="dMemo"></div>
         <div class="sec-body no-print" id="dMemoBtns" style="padding-top:0"></div>
       </div>
@@ -666,6 +673,7 @@ const LS_UNITS = 'ittv_units';
 const LS_CONTACTS = 'ittv_contacts';
 const LS_CONFIG = 'ittv_config';
 const LS_FB = 'ittv_fbconfig';
+const LS_ADMEMO = 'ittv_adminnotes';
 
 /* ── 권한 ──────────────────────────────────────────
    관리자 : 소장님 Google 계정. 전부 가능
@@ -741,6 +749,10 @@ const EQUIP_SHORT = { router:'공유기', stb:'셋톱', remote:'리모컨' };
 
 let units = [];        // 세대 배열 (개인정보 없음)
 let contacts = {};     // 호실 → { name, phone, phone4 }  — 관리자·직원만 내려받음
+/* 호실 → { items:[{t:'내용', at:작성시각}], updatedAt }
+   관리소장 전용. 서버 규칙이 관리자 외에는 읽기 자체를 거부하므로
+   직원·기사 기기에는 이 값이 비어 있습니다. */
+let adminNotes = {};
 let config = null;     // 설정
 let unitView = 'grid'; // grid | list
 let curFloor = 'all';
@@ -752,7 +764,7 @@ let toastTimer = null;
 let fbConfig = null;
 let firebaseApp=null, firebaseAuth=null, firebaseDB=null;
 let cloudUser = null;
-let unsubUnits=null, unsubConfig=null, unsubBookings=null, unsubContacts=null;
+let unsubUnits=null, unsubConfig=null, unsubBookings=null, unsubContacts=null, unsubAdminNotes=null;
 let cloudApplying = false;
 let lastSyncAt = null;
 /* 세대에 옮겨 적지 못한 예약 — 무슨 이유든 반드시 화면에 드러냅니다.
@@ -954,6 +966,10 @@ function loadLocal(){
     const ct = localStorage.getItem(LS_CONTACTS);
     contacts = ct ? JSON.parse(ct) : {};
   }catch(e){ contacts = {}; }
+  try{
+    const am = localStorage.getItem(LS_ADMEMO);
+    adminNotes = am ? JSON.parse(am) : {};
+  }catch(e){ adminNotes = {}; }
   units.forEach(normalizeUnit);
   migrateSlots(config, units);
 }
@@ -978,6 +994,10 @@ function saveLocal(){
     localStorage.setItem(LS_CONFIG, JSON.stringify(config));
     if(canSeePersonal()) localStorage.setItem(LS_CONTACTS, JSON.stringify(contacts));
     else localStorage.removeItem(LS_CONTACTS);
+    /* 관리소장 메모는 관리자 기기에만 남깁니다.
+       직원·기사 계정으로 바뀌면 기기에서도 지워, 화면에 뜰 여지를 없앱니다. */
+    if(isAdmin()) localStorage.setItem(LS_ADMEMO, JSON.stringify(adminNotes));
+    else localStorage.removeItem(LS_ADMEMO);
   }catch(e){ toast('⚠️ 저장 공간이 부족합니다'); }
 }
 // 서버에 저장된 상태를 기준점으로 기억 (부분 병합 저장에 씁니다)
@@ -1182,19 +1202,111 @@ function residentNotes(u){
     .map(s=>s.slice(MEMO_TAG.length).trim())
     .filter(Boolean);
 }
+/* ═══════════════════════════════════════════
+   관리소장 메모 — 오직 관리자만 보고 씁니다
+   입주민 메모(u.note)와 저장 위치가 완전히 다릅니다.
+   기사·직원은 서버 규칙 때문에 내려받지 못하므로 화면에도 뜨지 않습니다.
+   ═══════════════════════════════════════════ */
+function adminNotesOf(ho){
+  if(!isAdmin()) return [];
+  const d = adminNotes[String(ho)];
+  return (d && Array.isArray(d.items)) ? d.items.filter(x=>x && x.t) : [];
+}
+function fmtNoteAt(ms){
+  if(!ms) return '';
+  const d = new Date(ms);
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+async function pushAdminNote(ho){
+  const key = String(ho);
+  saveLocal();
+  if(!firebaseDB || !cloudUser || !isAdmin()) return;
+  const { doc, setDoc, deleteDoc } = window._fb;
+  try{
+    const items = (adminNotes[key] && adminNotes[key].items) || [];
+    if(!items.length){
+      delete adminNotes[key];
+      await deleteDoc(doc(firebaseDB,'sites',SITE_ID,'adminNotes',key));
+    } else {
+      await setDoc(doc(firebaseDB,'sites',SITE_ID,'adminNotes',key),
+                   { items:JSON.parse(JSON.stringify(items)), updatedAt:Date.now() });
+    }
+  }catch(e){
+    console.error('관리자 메모 저장 실패', e);
+    toast('⚠️ 메모를 서버에 올리지 못했습니다 — 「동기화」를 눌러 주세요', 6000);
+  }
+}
+function addAdminNote(ho, text){
+  if(!isAdmin()) return toast('관리자만 쓸 수 있습니다');
+  const t = String(text||'').trim();
+  if(!t) return;
+  const key = String(ho);
+  if(!adminNotes[key]) adminNotes[key] = { items:[] };
+  if(!Array.isArray(adminNotes[key].items)) adminNotes[key].items = [];
+  adminNotes[key].items.push({ t, at:Date.now() });
+  pushAdminNote(key); renderAll();
+}
+function editAdminNote(ho, i){
+  if(!isAdmin()) return;
+  const items = adminNotesOf(ho);
+  if(!items[i]) return;
+  const t = prompt('메모 수정', items[i].t);
+  if(t === null) return;
+  if(!t.trim()) return delAdminNote(ho, i, true);
+  adminNotes[String(ho)].items[i] = { t:t.trim(), at:items[i].at, editedAt:Date.now() };
+  pushAdminNote(ho); renderAll();
+}
+function delAdminNote(ho, i, silent){
+  if(!isAdmin()) return;
+  const items = adminNotesOf(ho);
+  if(!items[i]) return;
+  if(!silent && !confirm(`이 메모를 지웁니다.\n\n“${items[i].t}”`)) return;
+  adminNotes[String(ho)].items.splice(i,1);
+  pushAdminNote(ho); renderAll();
+}
+function addAdminNoteFromModal(ho){
+  const el = $('umAdmNew');
+  if(!el || !el.value.trim()) return;
+  addAdminNote(ho, el.value);
+  el.value = '';
+  const box = $('umAdmList');
+  if(box) box.innerHTML = adminNotesOf(ho).map((m,i)=>`
+    <div class="memo-body adm" style="margin-top:4px">🔒 ${esc(m.t)}
+      <span class="adm-at">${fmtNoteAt(m.at)}${m.editedAt?' (수정됨)':''}</span>
+      <span class="adm-act">
+        <button onclick="editAdminNote('${esc(ho)}',${i})">고치기</button>
+        <button onclick="delAdminNote('${esc(ho)}',${i})">지우기</button>
+      </span>
+    </div>`).join('') || '<div class="help" style="margin:0">아직 없습니다</div>';
+}
+function promptAdminNote(ho){
+  const t = prompt(`${ho}호 관리자 메모\n\n관리소장만 볼 수 있습니다. 직원·설치기사에게는 보이지 않습니다.`);
+  if(t) addAdminNote(ho, t);
+}
+
 function memoUnits(){
-  return units.filter(u=>residentNotes(u).length)
+  /* 입주민이 남긴 메모가 있거나, 관리자 메모가 달린 세대를 모두 모읍니다 */
+  return units.filter(u=>residentNotes(u).length || adminNotesOf(u.ho).length)
               .sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999')
                         || sortBySlotThenHo(a,b));
 }
 let memoOnlyOpen = false;    // 아직 장비교체가 끝나지 않은 세대만 보기
 function toggleMemoFilter(){ memoOnlyOpen = !memoOnlyOpen; renderMemos(); }
 
+/* 어느 쪽 메모를 볼지 — 'all' 전체 / 'res' 입주민 요청 / 'adm' 관리자 메모 */
+let memoKind = 'all';
+function setMemoKind(k){ memoKind = k; memoSel.clear(); renderMemos(); }
+function memoKindOk(u){
+  if(memoKind === 'res') return residentNotes(u).length > 0;
+  if(memoKind === 'adm') return adminNotesOf(u.ho).length > 0;
+  return true;
+}
+
 /* 호실 선택 — 고른 세대만 뽑아 쓸 수 있게 합니다.
    아무것도 안 고르면 화면에 보이는 전체가 대상입니다. */
 let memoSel = new Set();
 function memoVisible(){
-  const all = memoUnits();
+  const all = memoUnits().filter(memoKindOk);
   return memoOnlyOpen ? all.filter(u=>u.status!=='done') : all;
 }
 // 실제로 뽑아 쓸 대상 — 선택이 있으면 선택분만, 없으면 보이는 전체
@@ -1237,9 +1349,24 @@ function renderMemoSummary(){
 
 function renderMemos(){
   const box = $('dMemo'); if(!box) return;
-  const all = memoUnits();
+  const all = memoUnits().filter(memoKindOk);
   const list = memoOnlyOpen ? all.filter(u=>u.status!=='done') : all;
   const open = all.filter(u=>u.status!=='done').length;
+
+  /* 관리자일 때만 「입주민 요청 / 관리자 메모」 고르는 줄이 뜹니다.
+     직원·기사에게는 관리자 메모가 아예 없으므로 고를 것도 없습니다. */
+  const kindBox = $('dMemoKind');
+  if(kindBox){
+    if(isAdmin()){
+      const nRes = memoUnits().filter(u=>residentNotes(u).length).length;
+      const nAdm = memoUnits().filter(u=>adminNotesOf(u.ho).length).length;
+      const chip = (k,label,n)=>`<button class="btn btn-sm ${memoKind===k?'btn-primary':'btn-outline'}"
+          onclick="setMemoKind('${k}')">${label}${n!==null?` ${n}`:''}</button>`;
+      kindBox.innerHTML = `<div class="memo-bar" style="gap:6px">
+        ${chip('all','전체',null)}${chip('res','💬 입주민',nRes)}${chip('adm','🔒 관리자',nAdm)}</div>`;
+      kindBox.style.display = '';
+    } else { kindBox.innerHTML=''; kindBox.style.display='none'; }
+  }
 
   const cnt = $('mMemoCount');
   if(cnt) cnt.innerHTML = memoCountHtml();
@@ -1251,9 +1378,11 @@ function renderMemos(){
   }
 
   if(!list.length){
+    const none = memoKind==='adm' ? '관리자 메모가 아직 없습니다 · 세대를 열어 「🔒 관리자 메모」에서 남기실 수 있습니다'
+               : memoKind==='res' ? '입주민이 남긴 메모가 아직 없습니다'
+               : '남겨진 메모가 아직 없습니다';
     box.innerHTML = `<div class="empty" style="padding:22px"><p>${
-      all.length ? '교체 전인 세대가 없습니다 · 메모를 남긴 세대는 모두 작업이 끝났습니다'
-                 : '입주민이 남긴 메모가 아직 없습니다'}</p></div>`;
+      all.length ? '교체 전인 세대가 없습니다 · 메모를 남긴 세대는 모두 작업이 끝났습니다' : none}</p></div>`;
     $('dMemoBtns').innerHTML = '';
     return;
   }
@@ -1272,7 +1401,17 @@ function renderMemos(){
         <span class="memo-when">${esc(when)}</span>
       </div>
       ${who ? `<div class="memo-who">${esc(who)}</div>` : ''}
-      ${residentNotes(u).map(t=>`<div class="memo-body">“${esc(t)}”</div>`).join('')}
+      ${memoKind!=='adm' ? residentNotes(u).map(t=>`<div class="memo-body">💬 “${esc(t)}”</div>`).join('') : ''}
+      ${memoKind!=='res' ? adminNotesOf(u.ho).map((m,i)=>`
+        <div class="memo-body adm">🔒 ${esc(m.t)}
+          <span class="adm-at">${fmtNoteAt(m.at)}${m.editedAt?' (수정됨)':''}</span>
+          <span class="adm-act no-print">
+            <button onclick="event.stopPropagation();editAdminNote('${esc(u.ho)}',${i})">고치기</button>
+            <button onclick="event.stopPropagation();delAdminNote('${esc(u.ho)}',${i})">지우기</button>
+          </span>
+        </div>`).join('') : ''}
+      ${isAdmin() ? `<button class="btn btn-outline btn-sm no-print" style="margin-top:6px"
+          onclick="event.stopPropagation();promptAdminNote('${esc(u.ho)}')">🔒 관리자 메모 추가</button>` : ''}
     </div>`;
   }).join('');
 
@@ -1286,6 +1425,8 @@ function renderMemos(){
       <span class="memo-cnt">${picked ? `<b>${picked}개 선택됨</b>` : `선택 없음 · 보이는 ${list.length}곳 전체`}</span>
     </div>
     <button class="btn btn-outline btn-full btn-sm" onclick="copyMemos()">📋 메모 복사 (${target}곳)</button>
+    ${isAdmin() ? `<button class="btn btn-outline btn-full btn-sm" onclick="printAdminNotes()">🖨 관리자 메모 인쇄 (${
+      memoTargets().filter(u=>adminNotesOf(u.ho).length).length}곳)</button>` : ''}
     ${canSeePersonal() ? `
       <button class="btn btn-outline btn-full btn-sm" onclick="copyMemoPhones()">📞 연락처만 복사 (${target}곳)</button>
       <button class="btn btn-outline btn-full btn-sm" onclick="exportMemoCsv()">⬇ CSV 내려받기 (${target}곳)</button>` : ''}
@@ -1302,11 +1443,52 @@ function memoLines(withContact){
       const who = withContact && canSeePersonal()
         ? ` ${[nameOf(u),phoneOf(u)].filter(Boolean).join(' ')}` : '';
       // 메모 안에 줄바꿈이 있어도 들여쓰기가 흐트러지지 않도록 맞춰 줍니다
-      const body = residentNotes(u)
-        .map(t=>'  · ' + t.replace(/\n/g, '\n    '))
-        .join('\n');
-      return `${u.ho}호${who} [${STATUS[u.status].label}] ${when}\n${body}`;
+      const lines = [];
+      if(memoKind !== 'adm')
+        residentNotes(u).forEach(t=>lines.push('  💬 ' + t.replace(/\n/g, '\n     ')));
+      if(memoKind !== 'res')
+        adminNotesOf(u.ho).forEach(m=>lines.push(`  🔒 ${m.t.replace(/\n/g,'\n     ')} (${fmtNoteAt(m.at)})`));
+      return `${u.ho}호${who} [${STATUS[u.status].label}] ${when}\n${lines.join('\n')}`;
     });
+}
+
+/* 관리자 메모 일괄 인쇄 — 고른 호실만, 아무것도 안 고르면 보이는 전체 */
+function printAdminNotes(){
+  if(!isAdmin()) return toast('관리자만 볼 수 있습니다');
+  const list = memoTargets().filter(u=>adminNotesOf(u.ho).length);
+  if(!list.length) return toast('인쇄할 관리자 메모가 없습니다');
+  const now = new Date().toLocaleString('ko-KR');
+  const rows = list.map(u=>{
+    const when = u.date ? `${fmtDate(u.date)} ${slotLabel(u.date,u.slot)||''}`.trim() : '일정 미정';
+    const items = adminNotesOf(u.ho)
+      .map(m=>`<li>${esc(m.t)} <span class="at">${fmtNoteAt(m.at)}${m.editedAt?' (수정됨)':''}</span></li>`).join('');
+    return `<tr><td class="ho">${esc(u.ho)}호</td><td class="st">${STATUS[u.status].label}<br><span class="when">${esc(when)}</span></td>
+            <td><ul>${items}</ul></td></tr>`;
+  }).join('');
+  const w = window.open('', '_blank');
+  if(!w) return toast('팝업이 막혀 있습니다 — 브라우저에서 허용해 주세요', 6000);
+  w.document.write(`<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+    <title>관리자 메모 — 운서역더타임</title><style>
+    *{box-sizing:border-box}body{font-family:-apple-system,'Malgun Gothic',sans-serif;margin:18px;color:#111}
+    h1{font-size:19px;margin:0 0 4px}.sub{font-size:12px;color:#666;margin-bottom:12px}
+    .warn{border:1px solid #b91c1c;background:#fef2f2;color:#b91c1c;font-size:12px;font-weight:700;
+      padding:7px 10px;border-radius:6px;margin-bottom:12px}
+    table{width:100%;border-collapse:collapse}
+    th,td{border:1px solid #cbd5e1;padding:7px 9px;font-size:13px;vertical-align:top}
+    th{background:#f1f5f9;font-size:12px}
+    td.ho{width:64px;font-weight:800;white-space:nowrap}
+    td.st{width:96px;font-size:12px}.when{color:#666}
+    ul{margin:0;padding-left:16px}li{margin:2px 0;line-height:1.5}
+    .at{color:#666;font-size:11px;font-weight:700}
+    @media print{body{margin:8mm} .warn{border-color:#333;color:#333;background:#fff}}
+    </style></head><body>
+    <h1>운서역더타임 · 관리자 메모</h1>
+    <div class="sub">출력 ${esc(now)} · ${list.length}세대</div>
+    <div class="warn">⚠ 관리소장 전용 문서입니다. 설치기사·외부인에게 전달하지 마세요.</div>
+    <table><thead><tr><th>호실</th><th>상태 · 일정</th><th>메모</th></tr></thead><tbody>${rows}</tbody></table>
+    </body></html>`);
+  w.document.close();
+  setTimeout(()=>{ try{ w.print(); }catch(e){} }, 400);
 }
 function copyMemos(){
   const txt = memoLines(true).join('\n\n');
@@ -1692,6 +1874,23 @@ function openUnit(id){
             `<button type="button" class="seg-btn ${u.status===k?(k==='absent'||k==='hold'?'on-warn':'on'):''}" data-v="${k}" onclick="pickSeg(this,'umStatus')">${STATUS[k].label}</button>`).join('')}
         </div>
         <div class="fg"><label>메모</label><textarea id="umNote" placeholder="부재 사유, 재방문 약속, 특이사항">${esc(u.note||'')}</textarea></div>
+        ${isAdmin() ? `
+        <div class="fg">
+          <label>🔒 관리자 메모 <span style="font-weight:700;color:var(--muted);font-size:12.6px">— 소장님만 보입니다</span></label>
+          <div id="umAdmList">${adminNotesOf(u.ho).map((m,i)=>`
+            <div class="memo-body adm" style="margin-top:4px">🔒 ${esc(m.t)}
+              <span class="adm-at">${fmtNoteAt(m.at)}${m.editedAt?' (수정됨)':''}</span>
+              <span class="adm-act">
+                <button onclick="editAdminNote('${esc(u.ho)}',${i})">고치기</button>
+                <button onclick="delAdminNote('${esc(u.ho)}',${i})">지우기</button>
+              </span>
+            </div>`).join('') || '<div class="help" style="margin:0">아직 없습니다</div>'}</div>
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <input id="umAdmNew" placeholder="예) 경비실에 열쇠 맡겨둠" style="flex:1;padding:9px">
+            <button class="btn btn-outline btn-sm" onclick="addAdminNoteFromModal('${esc(u.ho)}')">추가</button>
+          </div>
+          <div class="help">설치기사·직원 기기에는 내려가지 않습니다. 작업기록을 초기화해도 남습니다.</div>
+        </div>` : ''}
       </div>
     </div>
     <div style="height:6px"></div>
@@ -3154,6 +3353,8 @@ async function collectAll(){
                 config:JSON.parse(JSON.stringify(config)),
                 units:units.map(u=>{ const c=JSON.parse(JSON.stringify(u)); delete c._srv; delete c.bkSig; delete c.bookingId; return c; }),
                 contacts:JSON.parse(JSON.stringify(contacts)),
+                /* 관리소장 메모도 함께 담습니다 — 빠뜨리면 복원해도 메모만 사라집니다 */
+                adminNotes:JSON.parse(JSON.stringify(adminNotes)),
                 bookings:[], slots:[] };
   if(firebaseDB && cloudUser && canSeeBookings()){
     const { collection, getDocs } = window._fb;
@@ -3191,7 +3392,7 @@ function importBackup(ev){
     catch(x){ ev.target.value=''; return alert('백업 파일을 읽지 못했습니다.\n올바른 백업 파일인지 확인해 주세요.'); }
     if(!d || !d.units || !Array.isArray(d.units)){ ev.target.value=''; return alert('백업 파일 형식이 아닙니다.'); }
     const when = d.at ? new Date(d.at).toLocaleString('ko-KR') : '(시각 없음)';
-    if(!confirm(`${when} 시점으로 되돌립니다.\n\n세대 ${d.units.length} · 연락처 ${Object.keys(d.contacts||{}).length} · 예약 ${(d.bookings||[]).length}건\n\n`
+    if(!confirm(`${when} 시점으로 되돌립니다.\n\n세대 ${d.units.length} · 연락처 ${Object.keys(d.contacts||{}).length} · 예약 ${(d.bookings||[]).length}건 · 관리자 메모 ${Object.keys(d.adminNotes||{}).length}곳\n\n`
       + `그 이후에 들어온 예약과 작업기록은 사라집니다.\n계속할까요?`)){ ev.target.value=''; return; }
     await restoreFrom(d);
     ev.target.value='';
@@ -3206,6 +3407,8 @@ async function restoreFrom(d){
     config = Object.assign(defaultConfig(), d.config||{});
     config.updatedAt = Date.now();
     contacts = JSON.parse(JSON.stringify(d.contacts||{}));
+    /* 옛 백업(관리자 메모가 없던 시절)이면 지금 것을 그대로 둡니다 */
+    if(d.adminNotes) adminNotes = JSON.parse(JSON.stringify(d.adminNotes));
     units = (d.units||[]).map(u=>normalizeUnit(JSON.parse(JSON.stringify(u))));
     bookingIndex.clear(); bookingIssues = []; failedPushes.clear();
     lastPub = { pub:'', avail:'', roster:'', slots:{} };
@@ -3226,6 +3429,13 @@ async function restoreFrom(d){
       const keepC = new Set(Object.keys(contacts).map(String));
       for(const dd of cc.docs) if(!keepC.has(dd.id)) await deleteDoc(doc(firebaseDB,'sites',SITE_ID,'contacts',dd.id));
       for(const ho of Object.keys(contacts)) await pushContact(ho);
+      // 관리소장 메모 — 관리자만 접근 가능하므로 관리자 계정일 때만 손댑니다
+      if(isAdmin() && d.adminNotes){
+        const an = await getDocs(collection(firebaseDB,'sites',SITE_ID,'adminNotes'));
+        const keepN = new Set(Object.keys(adminNotes).map(String));
+        for(const dd of an.docs) if(!keepN.has(dd.id)) await deleteDoc(doc(firebaseDB,'sites',SITE_ID,'adminNotes',dd.id));
+        for(const ho of Object.keys(adminNotes)) await pushAdminNote(ho);
+      }
       // 예약함
       const bs = await getDocs(collection(firebaseDB,'sites',SITE_ID,'bookings'));
       const keepB = new Set((d.bookings||[]).map(b=>b.__id));
@@ -3257,7 +3467,8 @@ async function resetWorkRecords(){
   if(!confirm(`작업기록을 초기화합니다.\n\n`
     + `지웁니다 — 예약 날짜·시간 · 진행상태 · 회수/설치 체크 · 임시비번 · 입주민 메모\n`
     + `        서버 예약함 · 잔여석 카운터\n\n`
-    + `그대로 둡니다 — 세대 목록 · 이름·연락처 · 작업일·시간대·정원 · 기사 명단 · 호텔 지정\n\n`
+    + `그대로 둡니다 — 세대 목록 · 이름·연락처 · 작업일·시간대·정원 · 기사 명단 · 호텔 지정\n`
+    + `             🔒 관리자 메모 (세대 사정이라 2차 일정 때도 필요합니다)\n\n`
     + `대상 ${n}세대. 계속할까요?`)) return;
   if(!confirm('되돌릴 수 없습니다. 먼저 백업을 받아두시는 것을 권합니다.\n\n그래도 진행할까요?')) return;
 
@@ -3615,8 +3826,8 @@ async function cloudSignOut(){
   cloudUser=null; renderCloudStatus();
 }
 function unsubscribeCloud(){
-  [unsubUnits, unsubConfig, unsubBookings, unsubContacts].forEach(f=>{ if(f) try{f();}catch(e){} });
-  unsubUnits=unsubConfig=unsubBookings=unsubContacts=null;
+  [unsubUnits, unsubConfig, unsubBookings, unsubContacts, unsubAdminNotes].forEach(f=>{ if(f) try{f();}catch(e){} });
+  unsubUnits=unsubConfig=unsubBookings=unsubContacts=unsubAdminNotes=null;
 }
 function subscribeCloud(){
   if(!firebaseDB || !cloudUser) return;
@@ -3688,6 +3899,18 @@ function subscribeCloud(){
       });
       saveLocal(); renderAll();
     }, err=>console.error('연락처 동기화', err));
+  }
+
+  /* 관리소장 메모 — 관리자만 구독합니다.
+     직원·기사 계정으로 구독하면 규칙이 거부해 콘솔에 오류만 쌓입니다. */
+  if(isAdmin()){
+    unsubAdminNotes = onSnapshot(collection(firebaseDB,'sites',SITE_ID,'adminNotes'), snap=>{
+      snap.docChanges().forEach(ch=>{
+        if(ch.type==='removed'){ delete adminNotes[ch.doc.id]; return; }
+        adminNotes[ch.doc.id] = ch.doc.data();
+      });
+      saveLocal(); renderAll();
+    }, err=>console.error('관리자 메모 동기화', err));
   }
 
   unsubConfig = onSnapshot(doc(firebaseDB,'sites',SITE_ID,'meta','config'), snap=>{
