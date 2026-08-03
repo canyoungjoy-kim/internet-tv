@@ -588,12 +588,16 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
       <div class="sec admin-only">
         <div class="sec-title">시간대 설정</div>
         <div class="sec-body">
-          <div class="fg"><label style="font-size:14.9px;color:var(--text)">평일 시간대 (월~금)</label><div id="cfgSlotsweekday"></div>
-            <button class="btn btn-outline btn-sm" onclick="addSlot('weekday')">+ 평일 시간대 추가</button></div>
-          <div class="fg"><label style="font-size:14.9px;color:var(--text)">토요일 시간대</label><div id="cfgSlotssat"></div>
-            <button class="btn btn-outline btn-sm" onclick="addSlot('sat')">+ 토요일 시간대 추가</button></div>
-          <div class="fg"><label style="font-size:14.9px;color:var(--text)">일요일 시간대</label><div id="cfgSlotssun"></div>
-            <button class="btn btn-outline btn-sm" onclick="addSlot('sun')">+ 일요일 시간대 추가</button></div>
+          <div class="help" style="margin-bottom:8px">
+            시간대는 <strong>묶음 A · B · C</strong> 세 벌을 만들어 두고, 위 작업일마다 어느 묶음을 쓸지 고릅니다.<br>
+            「요일대로」를 두면 예전처럼 <strong>A=월~금 · B=토 · C=일</strong> 로 자동 적용됩니다.
+          </div>
+          <div class="fg"><label style="font-size:14.9px;color:var(--text)">묶음 A 시간대 <span style="font-weight:700;color:var(--muted)">— 기본: 월~금</span></label><div id="cfgSlotsweekday"></div>
+            <button class="btn btn-outline btn-sm" onclick="addSlot('weekday')">+ A 시간대 추가</button></div>
+          <div class="fg"><label style="font-size:14.9px;color:var(--text)">묶음 B 시간대 <span style="font-weight:700;color:var(--muted)">— 기본: 토요일</span></label><div id="cfgSlotssat"></div>
+            <button class="btn btn-outline btn-sm" onclick="addSlot('sat')">+ B 시간대 추가</button></div>
+          <div class="fg"><label style="font-size:14.9px;color:var(--text)">묶음 C 시간대 <span style="font-weight:700;color:var(--muted)">— 기본: 일요일</span></label><div id="cfgSlotssun"></div>
+            <button class="btn btn-outline btn-sm" onclick="addSlot('sun')">+ C 시간대 추가</button></div>
           <div class="help"><strong>정원</strong>은 그 시간대에 받을 수 있는 세대 수입니다. 기사 인원 × 시간당 처리 세대로 잡으세요. 정원이 차면 입주민 예약 페이지에서 그 시간대가 <strong>마감</strong>으로 표시됩니다.</div>
           <div id="capCheck"></div>
         </div>
@@ -890,13 +894,25 @@ function defaultConfig(){
   };
 }
 
-const SLOT_KIND_LABEL = { weekday:'평일', sat:'토요일', sun:'일요일' };
-// 날짜가 평일/토요일/일요일 중 어느 시간표를 쓰는지
-function slotKindOf(dateStr){
+/* 시간대 묶음은 원래 요일(평일·토·일)로만 갈렸습니다.
+   그런데 「첫날만 11시 시작」처럼 같은 요일인데 다르게 잡아야 할 때가 생깁니다.
+   그래서 작업일마다 어느 묶음을 쓸지 직접 지정할 수 있게 했습니다.
+   지정하지 않은 날은 예전처럼 요일대로 정해지므로, 옛 설정도 그대로 동작합니다. */
+const SLOT_KIND_LABEL = { weekday:'A', sat:'B', sun:'C' };
+const SLOT_KIND_HINT  = { weekday:'A (평일 기본)', sat:'B', sun:'C' };
+const SLOT_KINDS = ['weekday','sat','sun'];
+
+// 요일만 보고 정하는 기본값 — 지정이 없을 때 쓰입니다
+function slotKindByDow(dateStr){
   const d = new Date(dateStr+'T00:00:00');
   if(isNaN(d)) return 'weekday';
   const g = d.getDay();
   return g===6 ? 'sat' : (g===0 ? 'sun' : 'weekday');
+}
+function slotKindOf(dateStr){
+  const day = (config && config.days || []).find(x=>x && x.date===dateStr);
+  if(day && SLOT_KINDS.includes(day.kind)) return day.kind;
+  return slotKindByDow(dateStr);
 }
 function slotsForDate(dateStr){
   if(!config) return [];
@@ -3202,7 +3218,11 @@ function renderSettings(){
   $('cfgDays').innerHTML = config.days.map((d,i)=>`
     <div style="display:flex;gap:7px;align-items:center;margin-bottom:7px">
       <input type="date" value="${escA(d.date||'')}" onchange="setDay(${i}, this.value)" style="flex:1">
-      <span style="font-size:14.9px;font-weight:800;color:var(--muted);min-width:52px">${d.date?SLOT_KIND_LABEL[slotKindOf(d.date)]:''}</span>
+      <select onchange="setDayKind(${i}, this.value)" title="이 날짜가 쓸 시간대 묶음"
+              style="padding:8px;min-width:104px;font-weight:800">
+        <option value="" ${!d.kind?'selected':''}>요일대로${d.date?' ('+SLOT_KIND_LABEL[slotKindByDow(d.date)]+')':''}</option>
+        ${SLOT_KINDS.map(k=>`<option value="${k}" ${d.kind===k?'selected':''}>${SLOT_KIND_LABEL[k]} 묶음</option>`).join('')}
+      </select>
       <button class="btn btn-outline btn-sm" onclick="delDay(${i})" style="color:var(--red)">삭제</button>
     </div>`).join('');
 
@@ -3261,6 +3281,32 @@ function saveConfigFromForm(){
   toast(config.bookingOpen ? '입주민 예약 접수를 열었습니다' : '입주민 예약 접수를 닫았습니다');
 }
 function setDay(i,v){ config.days[i].date=v; config.updatedAt=Date.now(); saveLocal(); pushConfig(); resetSlotCounters(); renderSettings(); }
+/* 묶음을 바꾸면 그 날짜의 시간대 목록이 통째로 달라집니다.
+   이미 예약이 잡혀 있으면 그 세대의 시간이 사라져 '예약확정인데 시간 없음'이 됩니다.
+   그래서 예약이 있으면 먼저 알리고, 소장님이 승낙할 때만 예약을 풀고 바꿉니다. */
+function setDayKind(i, v){
+  const d = config.days[i];
+  if(!d) return;
+  const kind = SLOT_KINDS.includes(v) ? v : '';
+  const cur  = d.date ? slotKindOf(d.date) : '';
+  const next = kind || (d.date ? slotKindByDow(d.date) : '');
+  if(d.date && cur !== next){
+    const list = units.filter(u=>u.date===d.date && u.slot);
+    const keep = new Set((config.slots[next]||[]).map(s=>s.id));
+    const lost = list.filter(u=>!keep.has(u.slot));
+    if(lost.length && !confirm(
+        `${fmtDate(d.date)} 를 ${SLOT_KIND_LABEL[next]} 묶음으로 바꿉니다.\n\n`
+      + `그 묶음에 없는 시간대에 잡힌 ${lost.length}세대의 예약이 해제됩니다.\n`
+      + `입주민이 넣은 예약도 함께 취소되며, 따로 안내가 가지 않습니다.\n\n`
+      + `해제 후 「미예약 세대」 목록에서 연락처를 뽑아 안내해 주세요.\n\n계속할까요?`)){
+      renderSettings(); return;
+    }
+    if(lost.length) releaseUnits(lost, `${fmtDate(d.date)} 시간대 묶음 변경으로 예약 해제`);
+  }
+  if(kind) d.kind = kind; else delete d.kind;
+  config.updatedAt = Date.now();
+  saveLocal(); pushConfig(); resetSlotCounters(); renderSettings();
+}
 function delDay(i){
   const d = config.days[i];
   const list = units.filter(u=>u.date===d.date);
@@ -4409,7 +4455,9 @@ async function publishPublic(force){
     const pubData = {
       siteName: config.siteName,
       bookingOpen: !!config.bookingOpen,
-      days: config.days.filter(d=>d.date).map(d=>({date:d.date})),
+      /* 날짜마다 어느 시간대 묶음을 쓰는지 함께 올립니다.
+         이게 없으면 입주민 화면은 요일로만 판단해, 사무소 화면과 시간이 어긋납니다. */
+      days: config.days.filter(d=>d.date).map(d=>({ date:d.date, kind:slotKindOf(d.date) })),
       slots: config.slots,
       // 호텔 운영 호실 — 입주민 예약 페이지에서 신청을 막습니다(사무소가 직접 조율)
       hotelHos: units.filter(u=>isHotel(u.presence)).map(u=>String(u.ho)).sort(),
