@@ -347,8 +347,10 @@ function fmtDate(d){ const p=d.split('-'); return `${Number(p[1])}월 ${Number(p
    ⚠ 이 판단이 사무소 화면과 어긋나면 입주민이 고른 시간과
      실제 방문 시간이 달라지므로, 반드시 지정값을 우선합니다. */
 function slotKindOf(d){
+  /* 사무소가 A·B·C 말고 새 시간표(D·E…)를 만들었을 수도 있습니다.
+     이름을 미리 정해두지 않고, 공개정보에 그 시간표가 실려 왔는지로 판단합니다. */
   const day = (pub && Array.isArray(pub.days) ? pub.days : []).find(x=>x && x.date===d);
-  if(day && ['weekday','sat','sun'].includes(day.kind)) return day.kind;
+  if(day && day.kind && pub && pub.slots && pub.slots[day.kind]) return day.kind;
   const x = new Date(d+'T00:00:00');
   if(isNaN(x)) return 'weekday';
   const g = x.getDay();
