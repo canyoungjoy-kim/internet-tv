@@ -228,11 +228,14 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
   border-radius:0 8px 8px 0;font-size:16.1px;font-weight:600;line-height:1.55;color:#78350f;
   white-space:pre-wrap;word-break:break-word}
 /* 관리소장 메모 — 입주민 메모(노란색)와 한눈에 구분되도록 청록 계열로 둡니다 */
-.memo-body.adm{background:#f0fdfa;border-left-color:#0d9488;color:#134e4a}
-.memo-body .adm-at{display:inline-block;margin-left:8px;font-size:12.6px;font-weight:700;color:#5b8f89}
-.memo-body .adm-act{display:inline-block;margin-left:8px}
-.memo-body .adm-act button{border:1px solid #99f6e4;background:#fff;color:#0f766e;border-radius:6px;
-  padding:2px 8px;font-size:12.6px;font-weight:700;cursor:pointer;margin-left:4px}
+/* 관리자 메모 — 본문·일시·버튼을 한 줄에 흘려 위아래 폭을 아낍니다.
+   바깥은 normal 로 두고 본문 span 에만 pre-wrap 을 줘야 버튼이 아래로 안 밀립니다. */
+.memo-body.adm{background:#f0fdfa;border-left-color:#0d9488;color:#134e4a;
+  white-space:normal;padding:6px 10px;margin-top:4px;line-height:1.45}
+.memo-body.adm .adm-t{white-space:pre-wrap}
+.memo-body .adm-at{font-size:12.2px;font-weight:700;color:#5b8f89;margin-left:6px;white-space:nowrap}
+.memo-body .adm-act button{border:1px solid #99f6e4;background:#fff;color:#0f766e;border-radius:5px;
+  padding:1px 7px;font-size:12.2px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:1px}
 #dMemoSec .sec-title{display:flex;align-items:center;gap:8px}
 #dMemoSec .sec-title button{margin-left:auto}
 
@@ -1297,14 +1300,7 @@ function addAdminNoteFromModal(ho){
   addAdminNote(ho, el.value);
   el.value = '';
   const box = $('umAdmList');
-  if(box) box.innerHTML = adminNotesOf(ho).map((m,i)=>`
-    <div class="memo-body adm" style="margin-top:4px">🔒 ${esc(m.t)}
-      <span class="adm-at">${fmtNoteAt(m.at)}${m.editedAt?' (수정됨)':''}</span>
-      <span class="adm-act">
-        <button onclick="editAdminNote('${esc(ho)}',${i})">고치기</button>
-        <button onclick="delAdminNote('${esc(ho)}',${i})">지우기</button>
-      </span>
-    </div>`).join('') || '<div class="help" style="margin:0">아직 없습니다</div>';
+  if(box) box.innerHTML = adminNotesOf(ho).map((m,i)=>`<div class="memo-body adm"><span class="adm-t">🔒 ${esc(m.t)}</span><span class="adm-at">${fmtNoteAt(m.at)}${m.editedAt?' (수정됨)':''}</span><span class="adm-act"><button onclick="editAdminNote('${esc(ho)}',${i})">수정</button><button onclick="delAdminNote('${esc(ho)}',${i})">삭제</button></span></div>`).join('') || '<div class="help" style="margin:0">아직 없습니다</div>';
 }
 function promptAdminNote(ho){
   const t = prompt(`${ho}호 관리자 메모\n\n관리소장만 볼 수 있습니다. 직원·설치기사에게는 보이지 않습니다.`);
@@ -1429,14 +1425,7 @@ function renderMemos(){
       </div>
       ${who ? `<div class="memo-who">${esc(who)}</div>` : ''}
       ${memoKind!=='adm' ? residentNotes(u).map(t=>`<div class="memo-body">💬 “${esc(t)}”</div>`).join('') : ''}
-      ${memoKind!=='res' ? adminNotesOf(u.ho).map((m,i)=>`
-        <div class="memo-body adm">🔒 ${esc(m.t)}
-          <span class="adm-at">${fmtNoteAt(m.at)}${m.editedAt?' (수정됨)':''}</span>
-          <span class="adm-act no-print">
-            <button onclick="event.stopPropagation();editAdminNote('${esc(u.ho)}',${i})">고치기</button>
-            <button onclick="event.stopPropagation();delAdminNote('${esc(u.ho)}',${i})">지우기</button>
-          </span>
-        </div>`).join('') : ''}
+      ${memoKind!=='res' ? adminNotesOf(u.ho).map((m,i)=>`<div class="memo-body adm"><span class="adm-t">🔒 ${esc(m.t)}</span><span class="adm-at">${fmtNoteAt(m.at)}${m.editedAt?' (수정됨)':''}</span><span class="adm-act no-print"><button onclick="event.stopPropagation();editAdminNote('${esc(u.ho)}',${i})">수정</button><button onclick="event.stopPropagation();delAdminNote('${esc(u.ho)}',${i})">삭제</button></span></div>`).join('') : ''}
       ${isAdmin() ? `<button class="btn btn-outline btn-sm no-print" style="margin-top:6px"
           onclick="event.stopPropagation();promptAdminNote('${esc(u.ho)}')">🔒 관리자 메모 추가</button>` : ''}
     </div>`;
@@ -1904,14 +1893,7 @@ function openUnit(id){
         ${isAdmin() ? `
         <div class="fg">
           <label>🔒 관리자 메모 <span style="font-weight:700;color:var(--muted);font-size:12.6px">— 소장님만 보입니다</span></label>
-          <div id="umAdmList">${adminNotesOf(u.ho).map((m,i)=>`
-            <div class="memo-body adm" style="margin-top:4px">🔒 ${esc(m.t)}
-              <span class="adm-at">${fmtNoteAt(m.at)}${m.editedAt?' (수정됨)':''}</span>
-              <span class="adm-act">
-                <button onclick="editAdminNote('${esc(u.ho)}',${i})">고치기</button>
-                <button onclick="delAdminNote('${esc(u.ho)}',${i})">지우기</button>
-              </span>
-            </div>`).join('') || '<div class="help" style="margin:0">아직 없습니다</div>'}</div>
+          <div id="umAdmList">${adminNotesOf(u.ho).map((m,i)=>`<div class="memo-body adm"><span class="adm-t">🔒 ${esc(m.t)}</span><span class="adm-at">${fmtNoteAt(m.at)}${m.editedAt?' (수정됨)':''}</span><span class="adm-act"><button onclick="editAdminNote('${esc(u.ho)}',${i})">수정</button><button onclick="delAdminNote('${esc(u.ho)}',${i})">삭제</button></span></div>`).join('') || '<div class="help" style="margin:0">아직 없습니다</div>'}</div>
           <div style="display:flex;gap:6px;margin-top:6px">
             <input id="umAdmNew" placeholder="예) 경비실에 열쇠 맡겨둠" style="flex:1;padding:9px">
             <button class="btn btn-outline btn-sm" onclick="addAdminNoteFromModal('${esc(u.ho)}')">추가</button>
@@ -2802,12 +2784,17 @@ const PRES_WORK_NOTE = {
   hotel:       '11시 체크아웃 후 청소 중 개방 상태일 때 진입',
 };
 
+/* 입주민 예약 페이지와 같은 표기를 씁니다 — 정오는 「낮 12시」, 자정은 「밤 12시」.
+   안내문과 예약 화면의 시간 표기가 다르면 문의 전화가 옵니다. */
 function planFmtTime(t){
   if(!t) return '';
   const [h,m] = String(t).split(':').map(Number);
+  const mm = m ? ' '+m+'분' : '';
+  if(h === 12) return `낮 12시${mm}`;
+  if(h === 0)  return `밤 12시${mm}`;
   const ap = h<12 ? '오전' : '오후';
-  const hh = h===0?12 : (h>12?h-12:h);
-  return `${ap} ${hh}시${m?' '+m+'분':''}`;
+  const hh = h>12 ? h-12 : h;
+  return `${ap} ${hh}시${mm}`;
 }
 
 /* 부록 B — 개인정보가 없는 작업요청서 샘플표 */
