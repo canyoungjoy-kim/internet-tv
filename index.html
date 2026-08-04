@@ -689,7 +689,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 const APP_VERSION = 'v1.0 (2026-07-27)';
 /* 판 번호 — 파일을 바꿀 때마다 올립니다.
    기기가 옛 파일을 물고 있으면 설정 화면의 숫자가 안 올라가므로 바로 알 수 있습니다. */
-const BUILD = 'A-5';
+const BUILD = 'A-7';
 const SITE_ID = 'unseo-thetime';
 const LS_UNITS = 'ittv_units';
 const LS_CONTACTS = 'ittv_contacts';
@@ -2162,6 +2162,20 @@ function saveUnitModal(){
     if(el) u.ins[e.key] = el.classList.contains('on');
   });
   const newStatus = segValue('umStatus');
+  /* ⚠ 완료 기록을 되돌리는 것은 되돌릴 수 없는 일입니다.
+     그 세대는 「교체 완료」 목록에서 빠지고, 입주민이 예약 페이지에서 다시 예약할 수 있게 되며,
+     작업요청서에도 다시 실립니다. 재작업(장비 불량·추가 세팅)이라면 맞는 동작이지만,
+     일정만 손보려다 상태 단추를 함께 눌러 실수로 완료가 풀리는 일이 실제로 있었습니다.
+     그래서 한 번 여쭙습니다. 회수·설치 체크와 일련번호는 그대로 둡니다. */
+  if(u.status === 'done' && newStatus && newStatus !== 'done'){
+    if(!confirm(`${u.ho}호는 이미 작업이 완료된 세대입니다.\n\n`
+      + `상태를 「${STATUS[newStatus].label}」로 되돌리면\n`
+      + `  · 교체 완료 목록에서 빠지고\n`
+      + `  · 입주민이 예약 페이지에서 다시 예약할 수 있게 되며\n`
+      + `  · 작업요청서에 다시 실립니다\n\n`
+      + `재작업이 필요해서 되돌리시는 것이 맞습니까?\n`
+      + `(회수·설치 체크와 일련번호는 그대로 둡니다)`)) return;
+  }
   u.status = newStatus || 'todo';
   /* 관리실 메모만 다시 씁니다 — 입주민이 남긴 말과 자동 기록은 건드리지 않습니다 */
   setOfficeNotes(u, $('umNote').value.split('\n'));
@@ -2182,6 +2196,7 @@ function saveUnitModal(){
 function renderSched(){
   const days = config.days.filter(d=>d.date);
   const overSlots = [];      // 정원을 넘긴 시간대 — 아래에서 한 줄로 모아 알려드립니다
+  const stranded = [];       // 지금 시간표에 없는 시간대에 잡힌 세대
   if(!days.length){
     $('sBody').innerHTML = `<div class="empty"><div class="ico">📅</div><p>작업일이 없습니다<br>설정에서 등록하세요</p></div>`;
   } else {
@@ -2205,7 +2220,14 @@ function renderSched(){
           <div style="font-size:12.6px;color:var(--green);font-weight:800;min-width:40px;text-align:right">✓${dn}</div>
         </div>`;
       }).join('');
-      const unassigned = dayList.filter(u=>!u.slot).length;
+      /* 지금 이 날짜의 시간표에 없는 시간대에 잡혀 있는 세대.
+         시간표를 바꾸면 생길 수 있는데, 그냥 두면 「예약확정」으로 보이면서도
+         일정표 어느 줄에도 안 잡히고 정원 계산에서도 빠져 유령이 됩니다.
+         (그날 기사는 안 가고, 입주민은 예약된 줄 알고 기다리십니다) */
+      const slotIds = new Set(slots.map(s=>s.id));
+      const strandedHere = dayList.filter(u=>u.slot && !slotIds.has(u.slot));
+      strandedHere.forEach(u=>stranded.push({ ho:String(u.ho), date:d.date, slot:u.slot }));
+      const unassigned = dayList.filter(u=>!u.slot).length + strandedHere.length;
       return `<div class="slot-day">
         <div class="slot-day-head">
           <span>${fmtDate(d.date)} ${SLOT_KIND_LABEL[slotKindOf(d.date)]}</span>
@@ -2217,6 +2239,19 @@ function renderSched(){
     }).join('');
     /* 넘긴 시간대가 있으면 맨 위에 모아 알려드립니다.
        날짜가 다섯이라 아래로 훑다 보면 (31/30) 하나쯤은 놓치기 쉽습니다. */
+    /* 시간표에 없는 시간대에 잡힌 세대 — 정원 초과보다 먼저 알려드립니다.
+       이건 '조금 빡빡한' 정도가 아니라 그 세대가 통째로 빠지는 문제입니다. */
+    if(stranded.length){
+      $('sBody').innerHTML =
+        `<div class="over-warn">⚠ 지금 시간표에 없는 시간대에 잡힌 세대 ${stranded.length}곳`
+        + `<div class="ow-list">${stranded.map(s=>esc(`${s.ho}호 — ${fmtDate(s.date)} (없어진 시간대)`)).join('<br>')}</div>`
+        + `<div class="ow-tip">시간표를 바꾸면서 남은 것입니다. 그대로 두면 일정표 어느 줄에도 잡히지 않고`
+        + ` 정원 계산에서도 빠져, 그날 기사가 가지 않는데 입주민은 예약된 줄 아십니다.<br>`
+        + `아래 단추로 「시간 미정」으로 되돌린 뒤 다시 잡아 주세요.</div>`
+        + `<button class="btn btn-outline btn-sm no-print" style="margin-top:8px"`
+        + ` onclick="fixStranded()">🔧 ${stranded.length}세대를 「시간 미정」으로 되돌리기</button></div>`
+        + $('sBody').innerHTML;
+    }
     if(overSlots.length){
       $('sBody').innerHTML =
         `<div class="over-warn">⚠ 정원을 넘긴 시간대 ${overSlots.length}곳`
@@ -2303,7 +2338,11 @@ function assignTech(even){
 }
 
 function showSlotUnits(date, slot){
-  const list = units.filter(u=>u.date===date && (u.slot||'')===slot)
+  /* 「시간 미정」에는 지금 시간표에 없는 시간대에 잡힌 세대도 함께 담습니다.
+     그래야 소장님이 그 세대를 찾아 다시 잡을 수 있습니다. */
+  const ids = new Set(slotsForDate(date).map(s=>s.id));
+  const list = units.filter(u=>u.date===date &&
+      (slot ? u.slot===slot : (!u.slot || !ids.has(u.slot))))
                     .sort((a,b)=>String(a.ho).localeCompare(String(b.ho)));
   if(!list.length) return toast('배정된 세대가 없습니다');
   const label = slot ? slotLabel(date,slot) : '시간 미정';
@@ -3481,6 +3520,35 @@ function setDayKind(i, v){
   config.updatedAt = Date.now();
   saveLocal(); pushConfig(); resetSlotCounters(); renderSettings();
 }
+/* 지금 시간표에 없는 시간대에 잡힌 세대를 「시간 미정」으로 되돌립니다.
+   날짜는 그대로 두어 그날 처리할 세대라는 것은 남기고, 시간만 비웁니다.
+   (입주민 예약함에도 반영해, 입주민 화면에서도 시간이 사라지고 다시 고를 수 있게 합니다) */
+function fixStranded(){
+  if(!isAdmin() && !canSeeBookings()) return toast('관리자·직원만 고칠 수 있습니다');
+  const bad = units.filter(u=>{
+    if(!u.date || !u.slot) return false;
+    if(!config.days.some(d=>d.date===u.date)) return true;      // 작업일도 아닌 날짜
+    return !slotsForDate(u.date).some(s=>s.id===u.slot);
+  });
+  if(!bad.length) return toast('되돌릴 세대가 없습니다');
+  if(!confirm(`${bad.length}세대의 시간을 비웁니다.\n\n`
+    + bad.slice(0,12).map(u=>`  ${u.ho}호 — ${fmtDate(u.date)}`).join('\n')
+    + (bad.length>12 ? `\n  … 외 ${bad.length-12}세대` : '')
+    + `\n\n날짜는 그대로 두고 시간만 비웁니다.\n`
+    + `일정표의 「시간 미정」에서 다시 잡아 주세요.\n\n계속할까요?`)) return;
+  bad.forEach(u=>{
+    const before = { date:u.date, slot:u.slot };
+    u.slot = '';
+    if(u.status==='booked') u.status='todo';
+    appendNote(u, '[관리실] 없어진 시간대라 시간을 비웠습니다 — 다시 잡아주세요');
+    u.updatedAt = Date.now();
+    pushUnit(u);
+    pushBookingUpdate(u, before);      // 입주민 화면에도 반영
+  });
+  saveLocal(); renderAll(); schedulePublish();
+  toast(`🔧 ${bad.length}세대를 「시간 미정」으로 되돌렸습니다 — 일정표에서 다시 잡아주세요`, 8000);
+}
+
 function delDay(i){
   const d = config.days[i];
   const list = units.filter(u=>u.date===d.date);
