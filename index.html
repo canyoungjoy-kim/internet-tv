@@ -137,6 +137,13 @@ input[type=checkbox]{width:auto;-webkit-appearance:checkbox;appearance:checkbox}
 .slot-day-head{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;background:var(--primary);color:#fff;border-radius:10px 10px 0 0;font-size:18.4px;font-weight:800}
 .slot-day-head .sd-cnt{font-size:14.9px;font-weight:700;background:rgba(255,255,255,.22);padding:3px 10px;border-radius:14px}
 .slot-row{display:flex;align-items:center;gap:9px;padding:10px 12px;border:1px solid var(--border);border-top:none;background:#fff;cursor:pointer}
+/* 정원을 넘긴 시간대 — 훑어볼 때 놓치지 않도록 */
+.slot-row.over{background:#fef2f2;border-left:4px solid #dc2626}
+.slot-row.over .slot-n{color:#b91c1c;font-weight:800}
+.over-warn{border:2px solid #dc2626;background:#fef2f2;color:#991b1b;border-radius:10px;
+  padding:12px 14px;margin-bottom:12px;font-weight:800;font-size:15.5px;line-height:1.6}
+.over-warn .ow-list{margin-top:7px;font-weight:700;font-size:14.6px;color:#b91c1c}
+.over-warn .ow-tip{margin-top:8px;font-weight:600;font-size:13.6px;color:#7f1d1d}
 .slot-row:last-child{border-radius:0 0 10px 10px}
 .slot-row:active{background:#f8fafc}
 .slot-time{font-size:17.2px;font-weight:800;min-width:96px}
@@ -676,7 +683,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 const APP_VERSION = 'v1.0 (2026-07-27)';
 /* 판 번호 — 파일을 바꿀 때마다 올립니다.
    기기가 옛 파일을 물고 있으면 설정 화면의 숫자가 안 올라가므로 바로 알 수 있습니다. */
-const BUILD = 'A-3';
+const BUILD = 'A-4';
 const SITE_ID = 'unseo-thetime';
 const LS_UNITS = 'ittv_units';
 const LS_CONTACTS = 'ittv_contacts';
@@ -1987,6 +1994,7 @@ function fillSlotSelect(dateStr, cur){
   const pendCounts = availCounts();
   const uNow = units.find(x=>x.id===editingUnitId);
   const hotel = uNow && isHotel(segValue('umPresence') || uNow.presence);
+  const overIds = new Set();
   sel.innerHTML = '<option value="">— 미정 —</option>' + list.map(s=>{
     // 이 세대를 포함한 실제 배정 인원 (아직 못 옮긴 입주민 예약까지 셉니다)
     const mineCounted = (uNow && uNow.date===dateStr && uNow.slot===s.id) ? 1 : 0;
@@ -1997,10 +2005,26 @@ function fillSlotSelect(dateStr, cur){
     const n = others + (mineHere ? 1 : 0);
     const cap = Number(s.cap)||0;
     const full = !mineHere && (cap <= 0 || others >= cap);   // 정원 0 = 받지 않음
+    /* 이미 정원을 넘긴 상태인지.
+       예전에는 '내가 그 자리에 들어간 순간' 초과 표시가 꺼졌습니다(full 이 mineHere 를 뺐으므로).
+       경고가 가장 필요한 때 — 넘겨놓은 뒤 다시 열어볼 때 — 에 아무 표시가 없었습니다. */
+    const over = cap > 0 && n > cap;
+    if(over) overIds.add(s.id);
     const tooEarly = hotel && !slotOkForHotel(s);
     return `<option value="${s.id}" ${mineHere?'selected':''}>${s.from}~${s.to} (${n}/${cap})`
-         + `${full?' 정원초과':''}${tooEarly?' ⚠ 체크아웃 전':''}</option>`;
+         + `${over?' ⚠ 정원초과':(full?' 정원초과':'')}${tooEarly?' ⚠ 체크아웃 전':''}</option>`;
   }).join('');
+
+  /* 넘긴 시간대를 고른 상태면 칸 자체를 붉게 — 저장한 뒤 다시 열어도 계속 보입니다 */
+  const paint = ()=>{
+    const bad = overIds.has(sel.value);
+    sel.style.borderColor = bad ? '#dc2626' : '';
+    sel.style.background  = bad ? '#fef2f2' : '';
+    sel.style.color       = bad ? '#b91c1c' : '';
+    sel.style.fontWeight  = bad ? '800' : '';
+  };
+  paint();
+  sel.onchange = paint;
 }
 /* 부재·재방문 세대를 남은 자리 중 가장 빠른 시간으로 옮깁니다 */
 function nextFreeSlot(afterDate){
@@ -2033,6 +2057,26 @@ function saveUnitModal(){
   if(!u) return closeUnitModal();
   // 관리자만 고칠 수 있는 항목 (직원·기사 화면에서는 잠겨 있음)
   if(isAdmin()){
+    /* 정원을 넘겨 배정하는 것 자체는 막지 않습니다 — 5분이면 끝나는 세대를 끼워넣거나
+       마지막 날 남은 세대를 넣어야 할 때가 있고, 그 판단은 현장에서만 할 수 있습니다.
+       다만 '모르는 사이에' 넘기면 그 시간대가 밀리고 뒤 시간대까지 연쇄로 늦어져,
+       예약 시간에 맞춰 집에 계신 입주민이 기다리시게 됩니다. 그래서 한 번 여쭙습니다. */
+    const nDate = $('umDate').value, nSlot = $('umSlot').value;
+    if(nDate && nSlot && (u.date !== nDate || u.slot !== nSlot)){
+      const s = slotsForDate(nDate).find(x=>x.id===nSlot);
+      const cap = Number(s && s.cap) || 0;
+      const pend = availCounts();
+      const others = Math.max(
+        units.filter(x=>x.date===nDate && x.slot===nSlot && x.id!==u.id).length,
+        (pend[nDate+'|'+nSlot] || 0) - ((u.date===nDate && u.slot===nSlot) ? 1 : 0));
+      if(cap > 0 && others + 1 > cap){
+        if(!confirm(`${fmtDate(nDate)} ${s.from}~${s.to} 는 정원 ${cap}인데 `
+          + `${others + 1}세대가 됩니다.\n\n`
+          + `그 시간대 작업이 밀리면 뒤 시간대까지 연쇄로 늦어지고,\n`
+          + `예약 시간에 맞춰 계신 입주민이 기다리시게 됩니다.\n\n`
+          + `그래도 이 시간대에 배정할까요?`)) return;
+      }
+    }
     const oldP4 = ctOf(u).phone4 || '';
     setContact(u.ho, $('umName').value.trim(), $('umPhone').value.trim());
     pushContact(u.ho);
@@ -2073,6 +2117,7 @@ function saveUnitModal(){
    ═══════════════════════════════════════════ */
 function renderSched(){
   const days = config.days.filter(d=>d.date);
+  const overSlots = [];      // 정원을 넘긴 시간대 — 아래에서 한 줄로 모아 알려드립니다
   if(!days.length){
     $('sBody').innerHTML = `<div class="empty"><div class="ico">📅</div><p>작업일이 없습니다<br>설정에서 등록하세요</p></div>`;
   } else {
@@ -2085,10 +2130,14 @@ function renderSched(){
         const n = list.length, capN = Number(s.cap)||0;
         const pct = capN ? Math.min(100, n/capN*100) : 0;
         const dn = list.filter(u=>u.status==='done').length;
-        return `<div class="slot-row" onclick="showSlotUnits('${d.date}','${s.id}')">
+        /* 정원을 넘긴 시간대는 한눈에 띄어야 합니다.
+           숫자만 (31/30) 으로 적어두면 여러 날을 훑을 때 그냥 지나칩니다. */
+        const over = capN > 0 && n > capN;
+        if(over) overSlots.push(`${fmtDate(d.date)} ${s.from}~${s.to} (${n}/${capN})`);
+        return `<div class="slot-row${over?' over':''}" onclick="showSlotUnits('${d.date}','${s.id}')">
           <div class="slot-time">${s.from}~${s.to}</div>
           <div class="slot-bar"><span class="${n>=capN&&capN?'full':''}" style="width:${pct}%"></span></div>
-          <div class="slot-n">${n}/${capN}</div>
+          <div class="slot-n">${over?'⚠ ':''}${n}/${capN}</div>
           <div style="font-size:12.6px;color:var(--green);font-weight:800;min-width:40px;text-align:right">✓${dn}</div>
         </div>`;
       }).join('');
@@ -2102,6 +2151,16 @@ function renderSched(){
         ${unassigned ? `<div class="slot-row" onclick="showSlotUnits('${d.date}','')"><div class="slot-time" style="color:var(--orange)">시간 미정</div><div class="slot-bar"></div><div class="slot-n">${unassigned}</div><div style="min-width:40px"></div></div>` : ''}
       </div>`;
     }).join('');
+    /* 넘긴 시간대가 있으면 맨 위에 모아 알려드립니다.
+       날짜가 다섯이라 아래로 훑다 보면 (31/30) 하나쯤은 놓치기 쉽습니다. */
+    if(overSlots.length){
+      $('sBody').innerHTML =
+        `<div class="over-warn">⚠ 정원을 넘긴 시간대 ${overSlots.length}곳`
+        + `<div class="ow-list">${overSlots.map(esc).join('<br>')}</div>`
+        + `<div class="ow-tip">작업이 밀리면 뒤 시간대까지 연쇄로 늦어집니다. `
+        + `정원을 늘리시거나 일부 세대를 다른 시간대로 옮겨 주세요.</div></div>`
+        + $('sBody').innerHTML;
+    }
   }
 
   // 일괄 배정 셀렉트
