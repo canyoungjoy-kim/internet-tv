@@ -689,7 +689,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 const APP_VERSION = 'v1.0 (2026-07-27)';
 /* 판 번호 — 파일을 바꿀 때마다 올립니다.
    기기가 옛 파일을 물고 있으면 설정 화면의 숫자가 안 올라가므로 바로 알 수 있습니다. */
-const BUILD = 'A-7';
+const BUILD = 'A-8';
 const SITE_ID = 'unseo-thetime';
 const LS_UNITS = 'ittv_units';
 const LS_CONTACTS = 'ittv_contacts';
@@ -1214,6 +1214,12 @@ const ISSUE_TEXT = {
               '작업일을 바꾸기 전에 접수된 예약입니다. 입주민께 연락해 일정을 다시 잡아주세요.'],
   skew:   b=>[`기기 시각이 어긋난 예약입니다${b.date?` (${esc(fmtDate(b.date))})`:''}`,
               '내용대로 반영했습니다. 혹시 모르니 입주민께 시간을 한 번 확인해 주세요.'],
+  /* 예약함과 세대 자료가 서로 다른 상태 — 어느 쪽이 맞는지는 사람이 정해야 합니다 */
+  mismatch: b=>[`입주민 예약과 세대 일정이 다릅니다`,
+              `입주민 예약: ${b.date?esc(fmtDate(b.date))+' '+esc(slotLabel(b.date,b.slot)||b.slot||''):'취소'}`
+              + ` · 세대에 적힌 일정: ${b.uDate?esc(fmtDate(b.uDate))+' '+esc(slotLabel(b.uDate,b.uSlot)||b.uSlot||''):'없음'}`
+              + `<br><button class="btn btn-outline btn-sm" style="margin-top:5px"`
+              + ` onclick="event.stopPropagation();resyncBooking('${esc(b.ho)}')">입주민 예약대로 맞추기</button>`],
 };
 function renderBookingIssues(){
   const box = $('bkIssues');
@@ -1230,11 +1236,12 @@ function renderBookingIssues(){
 }
 function dismissIssue(i){ bookingIssues.splice(i,1); renderBookingIssues(); }
 /* 같은 내용으로 반복해서 쌓이지 않도록 '호실+내용' 으로 한 번만 담습니다 */
-function flagBooking(kind, b, sig){
+function flagBooking(kind, b, sig, extra){
   const key = kind+'|'+b.ho+'|'+sig;
   if(bookingIssues.some(x=>x.key===key)) return;
-  bookingIssues.push({ key, kind, ho:String(b.ho), date:b.date||'', slot:b.slot||'',
-                       phone4:b.phone4||'', at:b.at||0 });
+  bookingIssues.push(Object.assign(
+    { key, kind, ho:String(b.ho), date:b.date||'', slot:b.slot||'',
+      phone4:b.phone4||'', at:b.at||0 }, extra||{}));
   renderBookingIssues();
 }
 
@@ -4291,6 +4298,7 @@ function subscribeCloud(){
     setBookingHealth('ok', `예약 ${bookingIndex.size}건 수신 중`);
     if(n){ saveLocal(); renderAll(); toast(`📩 입주민 예약 ${n}건이 반영되었습니다`, 3200); }
     else renderBookingHealth();
+    auditBookings();          // 받은 김에 예약함과 세대 자료가 같은지 견줍니다
   }, err=>{
     console.error('예약함 구독 실패', err);
     setBookingHealth('err', pushErrText(err));
@@ -4311,6 +4319,54 @@ function applyPendingBookings(reason){
     console.info('미반영 예약 반영', n, reason||'');
   }
   return n;
+}
+/* ── 정합성 점검 ─────────────────────────────────────────────
+   지금까지의 방어는 모두 '사건이 일어날 때' 작동합니다.
+   예약이 도착할 때 반영하고, 저장이 실패하면 다시 올립니다.
+   그런데 그 사건을 한 번이라도 놓치면, 어긋난 상태는 영원히 그대로 남고
+   화면 어디에도 표시가 없습니다. 실제로 그런 일이 있었습니다.
+
+   그래서 사건과 무관하게 '지금 이 순간 예약함과 세대 자료가 같은가'를 통째로 견줍니다.
+   입주민이 예약했는데 사무소 화면에 안 뜨는 일을 막는 마지막 방어선입니다. */
+function auditBookings(){
+  if(!bookingsLoaded || !units.length) return 0;
+  let bad = 0;
+  bookingIndex.forEach((b, ho)=>{
+    const u = units.find(x=>String(x.ho)===String(ho));
+    if(!u) return;                       // 이미 'orphan' 으로 따로 알립니다
+    if(u.status==='done') return;        // 이미 'late' 로 따로 알립니다
+    const bd = b.cancelled ? '' : (b.date||'');
+    const bs = b.cancelled ? '' : (b.slot||'');
+    if((u.date||'') === bd && (u.slot||'') === bs) return;   // 같으면 할 일 없음
+
+    /* 사무소가 방금 옮겨 아직 예약함에 되돌려 쓰지 못한 건은 이미
+       「입주민 화면에 반영 못 한 일정」으로 붉은 띠에 잡혀 있습니다. 중복해서 알리지 않습니다. */
+    if(failedBookingWrites.has(String(ho))) return;
+    /* 없어진 시간대에 잡힌 세대는 일정표에서 따로 알립니다. */
+    if(u.date && u.slot && config.days.some(d=>d.date===u.date)
+       && !slotById(u.date, u.slot)) return;
+
+    bad++;
+    flagBooking('mismatch', b, bookingSig(b) + '¦' + (u.date||'') + '¦' + (u.slot||''),
+                { uDate: u.date||'', uSlot: u.slot||'' });
+  });
+  return bad;
+}
+/* 어긋난 세대를 예약함 기준으로 다시 맞춥니다.
+   '이미 처리했다'는 표시(bkSig)를 지워, 반영 로직이 처음 보는 것처럼 다시 돌게 합니다. */
+function resyncBooking(ho){
+  const u = units.find(x=>String(x.ho)===String(ho));
+  const b = bookingIndex.get(String(ho));
+  if(!u || !b) return toast('맞출 예약을 찾지 못했습니다');
+  u.bkSig = '';
+  if(applyBooking(b, b.id)){
+    saveLocal(); renderAll();
+    toast(`✅ ${ho}호를 입주민 예약대로 맞췄습니다`, 4000);
+  } else {
+    toast(`${ho}호는 이미 예약대로입니다`, 3000);
+  }
+  bookingIssues = bookingIssues.filter(x=>!(x.kind==='mismatch' && x.ho===String(ho)));
+  renderBookingIssues();
 }
 function setBookingHealth(state, msg){
   bookingHealth = state; bookingHealthMsg = msg || '';
@@ -4539,7 +4595,17 @@ const WRITABLE_KEYS = {
   tech:  ['ret','ins','sn','status','note','updatedAt','pin'],
 };
 async function pushUnit(u, full){
-  if(!firebaseDB || !cloudUser || cloudApplying) return;
+  if(!firebaseDB || !cloudUser) return;
+  /* 서버 자료를 받아 적는 중에는 쓰지 않습니다 — 방금 받은 값을 도로 덮어쓰게 됩니다.
+     ⚠ 다만 조용히 버리면 안 됩니다. 예전에는 그냥 return 이라, 그 찰나에 고친 내용이
+        기기 화면에만 남고 서버에는 영영 올라가지 않았습니다. 실패 목록에도 없으니
+        재시도도 없고 붉은 띠도 안 떴습니다. 이제 실패로 적어 두고 45초마다 다시 올립니다. */
+  if(cloudApplying){
+    failedPushes.set(u.id, u.id);
+    renderPushBanner();
+    setTimeout(autoRetry, 1500);
+    return;
+  }
   /* '입주민 예약을 받아 적는 중인가'는 반드시 지금(첫 await 전에) 확인해 두어야 합니다.
      아래 setDoc 을 기다리는 사이에 applyBooking 이 이미 끝나 깃발이 내려가므로,
      나중에 확인하면 입주민이 넣은 예약을 우리가 넣은 것으로 착각해
@@ -4879,6 +4945,10 @@ async function forceSync(){
       bookingsLoaded = true;
       applyPendingBookings('수동 동기화');
       setBookingHealth('ok', `예약 ${bookingIndex.size}건 수신 중`);
+      /* 「동기화」는 소장님이 미덥지 않을 때 누르시는 단추입니다.
+         그때야말로 예약함과 세대 자료가 같은지 통째로 견줘 드려야 합니다. */
+      const gap = auditBookings();
+      if(gap) toast(`⚠️ 입주민 예약과 세대 일정이 다른 세대 ${gap}곳 — 대시보드에서 확인해 주세요`, 9000);
     }catch(e){
       fails.push('입주민 예약함');
       setBookingHealth('err', pushErrText(e));
@@ -4934,7 +5004,13 @@ setInterval(autoRetry, 45000);
 /* 예약 반영 안전망 —
    어떤 이유로든 세대에 옮겨 적히지 못한 예약이 남아 있으면 주기적으로 다시 맞춥니다.
    입주민이 예약했는데 사무소 화면에 안 뜨는 일이 없도록 하는 마지막 방어선입니다. */
-setInterval(()=>{ if(cloudUser && bookingsLoaded) applyPendingBookings('주기 점검'); }, 30000);
+setInterval(()=>{
+  if(!cloudUser || !bookingsLoaded) return;
+  applyPendingBookings('주기 점검');
+  /* 반영을 다시 시도한 뒤에도 여전히 어긋나 있으면 소장님께 알립니다.
+     이 점검이 없으면 어긋난 상태가 화면 어디에도 안 나타난 채 그대로 굳습니다. */
+  auditBookings();
+}, 30000);
 
 /* ═══════════════════════════════════════════
    시작
