@@ -245,10 +245,16 @@ footer{text-align:center;padding:20px 18px;color:var(--muted);font-size:13.5px;l
     <strong style="font-size:16px;color:var(--text)">문의 · 관리사무소 <a href="tel:0327105679" style="color:var(--primary)">032-710-5679</a></strong><br>
     예약 취소·변경은 예약 당일 아침 7시까지이며, 이후에는 불가합니다.<br>
     입력하신 정보는 장비교체 작업에만 사용되며, 작업 종료 후 폐기됩니다.
+    <!-- 판 번호 — 기기가 옛 파일을 물고 있는지 눈으로 확인하는 용도입니다.
+         파일을 바꿀 때마다 이 숫자를 올립니다. -->
+    <div style="margin-top:10px;font-size:11.5px;opacity:.5">판 <span id="buildTag">-</span></div>
   </footer>
 </div>
 
 <script>
+/* 판 번호 — 파일을 바꿀 때마다 올립니다.
+   휴대폰이 옛 파일을 물고 있으면 여기 숫자가 안 올라가므로 바로 알 수 있습니다. */
+const BUILD = 'B-3';
 const SITE_ID = 'unseo-thetime';
 const FB_VER = '10.12.2';
 const DOW = ['일','월','화','수','목','금','토'];
@@ -859,6 +865,7 @@ function restart(){
 $('inHo').addEventListener('keydown', e=>{ if(e.key==='Enter') $('inPh4').focus(); });
 $('inPh4').addEventListener('keydown', e=>{ if(e.key==='Enter') doVerify(); });
 
+$('buildTag').textContent = BUILD;
 boot();
 </script>
 </body>

@@ -523,6 +523,10 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 
     <!-- ══════════ 설정 ══════════ -->
     <div class="view" id="v-settings">
+      <!-- 판 번호 — 이 기기가 옛 파일을 물고 있는지 눈으로 확인하는 용도입니다 -->
+      <div style="text-align:right;font-size:12px;color:var(--muted);padding:2px 2px 6px">
+        관리자 화면 판 <strong id="buildTag">-</strong>
+      </div>
       <div class="sec">
         <div class="sec-title">클라우드 동기화</div>
         <div class="sec-body">
@@ -670,6 +674,9 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
    상수 · 상태
    ═══════════════════════════════════════════ */
 const APP_VERSION = 'v1.0 (2026-07-27)';
+/* 판 번호 — 파일을 바꿀 때마다 올립니다.
+   기기가 옛 파일을 물고 있으면 설정 화면의 숫자가 안 올라가므로 바로 알 수 있습니다. */
+const BUILD = 'A-3';
 const SITE_ID = 'unseo-thetime';
 const LS_UNITS = 'ittv_units';
 const LS_CONTACTS = 'ittv_contacts';
@@ -4730,6 +4737,7 @@ setInterval(()=>{ if(cloudUser && bookingsLoaded) applyPendingBookings('주기 �
 /* ═══════════════════════════════════════════
    시작
    ═══════════════════════════════════════════ */
+$('buildTag').textContent = BUILD;
 loadLocal();
 renderAll();
 initFirebase();

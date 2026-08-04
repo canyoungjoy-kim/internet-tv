@@ -1,6 +1,6 @@
 /* 인터넷·TV 장비교체 앱 전용 서비스워커
    scope: /internet-TV/  — 루트 시설일지 앱(sw.js, scope '/')과 캐시가 완전히 분리됩니다. */
-const CACHE = 'ittv-v2';   // 이름을 바꾸면 옛 캐시(고정돼 있던 fbconfig.js 포함)가 지워집니다
+const CACHE = 'ittv-v3';   // 이름을 바꾸면 옛 캐시(고정돼 있던 fbconfig.js 포함)가 지워집니다
 const ASSETS = [
   './',
   './index.html',
