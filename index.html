@@ -4596,8 +4596,14 @@ async function reconcileSlots(counts){
   let deferred = false;
   for(const [key, n] of Object.entries(counts)){
     const [date, slot] = key.split('|');
-    if(lastPub.slots[key] === n) continue;
     const s = slotById(date, slot);
+    const cap = Number(s && s.cap)||0;
+    /* 예약수뿐 아니라 정원까지 견줍니다.
+       예전에는 예약수만 비교해서, 예약이 시작된 뒤 정원만 고치면
+       카운터에 옛 정원이 남았습니다. 입주민은 규칙상 정원을 못 바꾸므로
+       그 시간대는 예약이 통째로 거부되었습니다. */
+    const sig = n + '/' + cap;
+    if(lastPub.slots[key] === sig) continue;
     const ref = doc(firebaseDB,'sites',SITE_ID,'slots', `${date}__${slot}`);
     try{
       /* 그냥 덮어쓰면 안 됩니다.
@@ -4608,12 +4614,21 @@ async function reconcileSlots(counts){
       const wrote = await runTransaction(firebaseDB, async tx=>{
         const snap = await tx.get(ref);
         const d = snap.exists() ? snap.data() : null;
-        if(d && (d.n||0) > n && Date.now() - (d.at||0) < SLOT_FRESH_MS) return false;
-        tx.set(ref, { date, slot, cap: Number(s && s.cap)||0, n, at: Date.now() });
-        return true;
+        const ahead = !!(d && (d.n||0) > n && Date.now() - (d.at||0) < SLOT_FRESH_MS);
+        const capOk = !d || Number(d.cap||0) === cap;
+        /* 서버가 우리보다 앞선 값을 방금 받았으면 이번 회차는 미룹니다.
+           다만 정원이 어긋나 있으면 미룰 수 없습니다 — 미루는 동안
+           그 시간대의 입주민 예약이 전부 거부되기 때문입니다.
+           그럴 때는 예약수는 서버 값을 지키고 정원만 바로잡습니다. */
+        if(ahead && capOk) return null;
+        const nOut = ahead ? (d.n||0) : n;
+        tx.set(ref, { date, slot, cap, n:nOut, at: Date.now() });
+        return { nOut, ahead };
       });
-      if(wrote) lastPub.slots[key] = n;
-      else deferred = true;
+      /* 실제로 쓴 값을 기억합니다. 쓴 값과 다른 것을 기억해두면
+         다음 회차에 '이미 맞다'고 착각해 건너뜁니다. */
+      if(wrote) lastPub.slots[key] = wrote.nOut + '/' + cap;
+      if(!wrote || wrote.ahead) deferred = true;
     }catch(e){ console.error('잔여석 갱신 실패', key, e); deferred = true; }
   }
   // 건너뛴 칸이 있으면 예약이 도착할 시간을 준 뒤 한 번 더 맞춥니다

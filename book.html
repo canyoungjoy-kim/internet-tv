@@ -364,11 +364,17 @@ function slotsFor(d){
   if(kind !== 'weekday' && !s[kind] && s.weekend) return s.weekend;
   return s[kind] || [];
 }
+/* 12시는 「오전/오후 12시」로 적으면 어르신들이 낮인지 밤인지 헷갈리십니다.
+   (문법상 정오는 오후 12시이지만, 밤으로 읽는 분이 적지 않습니다)
+   그래서 정오는 「낮 12시」, 자정은 「밤 12시」로 못박아 적습니다. */
 function fmtTime(t){
   const [h,m] = t.split(':').map(Number);
+  const mm = m ? ' '+m+'분' : '';
+  if(h === 12) return `낮 12시${mm}`;
+  if(h === 0)  return `밤 12시${mm}`;
   const ap = h<12 ? '오전' : '오후';
-  const hh = h===0?12 : (h>12?h-12:h);
-  return `${ap} ${hh}시${m?' '+m+'분':''}`;
+  const hh = h>12 ? h-12 : h;
+  return `${ap} ${hh}시${mm}`;
 }
 async function sha256hex(str){
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -690,6 +696,15 @@ async function doSubmit(){
       }
 
       const n = newSnap.exists() ? (newSnap.data().n||0) : 0;
+      /* 정원은 서버에 적힌 값을 그대로 되돌려 씁니다 — 새 값을 적어 보내면 안 됩니다.
+         규칙이 「입주민은 정원을 못 바꾼다」로 막고 있어서(정원을 999 로 올리거나
+         0 으로 내려 시간대를 마감시키는 장난 방지), 사무소가 정원을 고친 뒤에
+         입주민 기기가 새 정원을 실어 보내면 예약 자체가 서버에서 거부되고
+         화면에는 엉뚱하게 「예약 접수가 닫혀 있습니다」로 뜹니다.
+         자리가 남았는지는 아래에서 공개정보의 정원(cap)으로 판단하므로,
+         정원을 늘린 것은 곧바로 반영됩니다. */
+      const capServer = (newSnap.exists() && newSnap.data().cap !== undefined)
+                          ? newSnap.data().cap : cap;
       const alreadyHere = prev && !moving;       // 같은 시간대로 재신청 = 인원 변화 없음
       wasHere = !!alreadyHere;
       movedFrom = moving ? { date:prev.date, slot:prev.slot } : null;
@@ -699,7 +714,7 @@ async function doSubmit(){
       }
 
       if(!alreadyHere){
-        tx.set(newRef, { date:sel.date, slot:sel.slot, cap, n:n+1, at:Date.now() });
+        tx.set(newRef, { date:sel.date, slot:sel.slot, cap:capServer, n:n+1, at:Date.now() });
         if(oldRef) tx.set(oldRef, { date:prev.date, slot:prev.slot, cap:oldCap, n:Math.max(0, oldN-1), at:Date.now() });
       }
       tx.set(bkRef, {
