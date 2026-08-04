@@ -1441,8 +1441,11 @@ function renderMemos(){
       <span class="memo-cnt">${picked ? `<b>${picked}개 선택됨</b>` : `선택 없음 · 보이는 ${list.length}곳 전체`}</span>
     </div>
     <button class="btn btn-outline btn-full btn-sm" onclick="copyMemos()">📋 메모 복사 (${target}곳)</button>
-    ${isAdmin() ? `<button class="btn btn-outline btn-full btn-sm" onclick="printAdminNotes()">🖨 관리자 메모 인쇄 (${
-      memoTargets().filter(u=>adminNotesOf(u.ho).length).length}곳)</button>` : ''}
+    <button class="btn btn-outline btn-full btn-sm" onclick="printMemos()">🖨 ${
+      memoKind==='adm' ? '관리자 메모' : memoKind==='res' ? '입주민 메모' : '세대메모'} 인쇄 (${
+      memoTargets().filter(u => memoKind==='adm' ? adminNotesOf(u.ho).length
+        : memoKind==='res' ? residentNotes(u).length
+        : (residentNotes(u).length || adminNotesOf(u.ho).length)).length}곳)</button>
     ${canSeePersonal() ? `
       <button class="btn btn-outline btn-full btn-sm" onclick="copyMemoPhones()">📞 연락처만 복사 (${target}곳)</button>
       <button class="btn btn-outline btn-full btn-sm" onclick="exportMemoCsv()">⬇ CSV 내려받기 (${target}곳)</button>` : ''}
@@ -1468,23 +1471,35 @@ function memoLines(withContact){
     });
 }
 
-/* 관리자 메모 일괄 인쇄 — 고른 호실만, 아무것도 안 고르면 보이는 전체 */
-function printAdminNotes(){
-  if(!isAdmin()) return toast('관리자만 볼 수 있습니다');
-  const list = memoTargets().filter(u=>adminNotesOf(u.ho).length);
-  if(!list.length) return toast('인쇄할 관리자 메모가 없습니다');
+/* 세대메모 인쇄 — 화면 위쪽 필터(전체·입주민·관리자)를 그대로 따라갑니다.
+   ⚠ 종이는 기사·외부인 손에 넘어갈 수 있어 이름·연락처는 싣지 않습니다.
+     연락처가 필요하시면 「연락처만 복사」나 CSV 를 쓰세요. */
+function printMemos(){
+  const onlyAdm = memoKind === 'adm';
+  const onlyRes = memoKind === 'res';
+  if(onlyAdm && !isAdmin()) return toast('관리자만 볼 수 있습니다');
+  const list = memoTargets().filter(u =>
+    (onlyAdm ? adminNotesOf(u.ho).length
+     : onlyRes ? residentNotes(u).length
+     : (residentNotes(u).length || adminNotesOf(u.ho).length)));
+  if(!list.length) return toast('인쇄할 메모가 없습니다');
+
+  const title = onlyAdm ? '관리자 메모' : onlyRes ? '입주민 요청 메모' : '세대메모';
+  const hasAdm = !onlyRes && isAdmin() && list.some(u=>adminNotesOf(u.ho).length);
   const now = new Date().toLocaleString('ko-KR');
   const rows = list.map(u=>{
     const when = u.date ? `${fmtDate(u.date)} ${slotLabel(u.date,u.slot)||''}`.trim() : '일정 미정';
-    const items = adminNotesOf(u.ho)
-      .map(m=>`<li>${esc(m.t)} <span class="at">${fmtNoteAt(m.at)}${m.editedAt?' (수정됨)':''}</span></li>`).join('');
+    const items = [];
+    if(!onlyAdm) residentNotes(u).forEach(t=>items.push(`<li class="res">${esc(t)}</li>`));
+    if(!onlyRes) adminNotesOf(u.ho).forEach(m=>items.push(
+      `<li class="adm">${esc(m.t)} <span class="at">${fmtNoteAt(m.at)}${m.editedAt?' (수정됨)':''}</span></li>`));
     return `<tr><td class="ho">${esc(u.ho)}호</td><td class="st">${STATUS[u.status].label}<br><span class="when">${esc(when)}</span></td>
-            <td><ul>${items}</ul></td></tr>`;
+            <td><ul>${items.join('')}</ul></td><td class="chk"></td></tr>`;
   }).join('');
   const w = window.open('', '_blank');
   if(!w) return toast('팝업이 막혀 있습니다 — 브라우저에서 허용해 주세요', 6000);
   w.document.write(`<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
-    <title>관리자 메모 — 운서역더타임</title><style>
+    <title>${title} — 운서역더타임</title><style>
     *{box-sizing:border-box}body{font-family:-apple-system,'Malgun Gothic',sans-serif;margin:18px;color:#111}
     h1{font-size:19px;margin:0 0 4px}.sub{font-size:12px;color:#666;margin-bottom:12px}
     .warn{border:1px solid #b91c1c;background:#fef2f2;color:#b91c1c;font-size:12px;font-weight:700;
@@ -1493,15 +1508,17 @@ function printAdminNotes(){
     th,td{border:1px solid #cbd5e1;padding:7px 9px;font-size:13px;vertical-align:top}
     th{background:#f1f5f9;font-size:12px}
     td.ho{width:64px;font-weight:800;white-space:nowrap}
-    td.st{width:96px;font-size:12px}.when{color:#666}
-    ul{margin:0;padding-left:16px}li{margin:2px 0;line-height:1.5}
+    td.st{width:104px;font-size:12px}.when{color:#666}
+    td.chk{width:52px}
+    ul{margin:0;padding-left:15px}li{margin:2px 0;line-height:1.5}
+    li.res{list-style:'💬 '}li.adm{list-style:'🔒 ';color:#134e4a}
     .at{color:#666;font-size:11px;font-weight:700}
     @media print{body{margin:8mm} .warn{border-color:#333;color:#333;background:#fff}}
     </style></head><body>
-    <h1>운서역더타임 · 관리자 메모</h1>
-    <div class="sub">출력 ${esc(now)} · ${list.length}세대</div>
-    <div class="warn">⚠ 관리소장 전용 문서입니다. 설치기사·외부인에게 전달하지 마세요.</div>
-    <table><thead><tr><th>호실</th><th>상태 · 일정</th><th>메모</th></tr></thead><tbody>${rows}</tbody></table>
+    <h1>운서역더타임 · ${title}</h1>
+    <div class="sub">출력 ${esc(now)} · ${list.length}세대${hasAdm?' · 💬 입주민 요청 / 🔒 관리자 메모':''}</div>
+    ${hasAdm ? `<div class="warn">⚠ 🔒 표시는 관리소장 전용 기록입니다. 설치기사·외부인에게 전달하지 마세요.</div>` : ''}
+    <table><thead><tr><th>호실</th><th>상태 · 일정</th><th>메모</th><th>확인</th></tr></thead><tbody>${rows}</tbody></table>
     </body></html>`);
   w.document.close();
   setTimeout(()=>{ try{ w.print(); }catch(e){} }, 400);
