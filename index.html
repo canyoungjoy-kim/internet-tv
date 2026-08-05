@@ -140,7 +140,8 @@ input[type=checkbox]{width:auto;-webkit-appearance:checkbox;appearance:checkbox}
 /* 예약 활동 시각 — 언제 접수·변경·취소됐는지 한 줄로 */
 .ul-act{margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.4px}
 .ac-tag{border-radius:5px;padding:1px 7px;font-weight:800;font-size:11.8px;color:#fff}
-.ac-tag.ac-n{background:#2563eb}.ac-tag.ac-c{background:#d97706}.ac-tag.ac-x{background:#dc2626}
+/* 신규=파랑 · 변경=빨강 · 취소=검정 */
+.ac-tag.ac-n{background:#2563eb}.ac-tag.ac-c{background:#dc2626}.ac-tag.ac-x{background:#111827}
 .ac-ago{font-weight:800;color:var(--text)}
 .ac-when{color:var(--muted);font-weight:600}
 /* 오늘 예약 변동 — 대시보드 */
@@ -707,7 +708,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 const APP_VERSION = 'v1.0 (2026-07-27)';
 /* 판 번호 — 파일을 바꿀 때마다 올립니다.
    기기가 옛 파일을 물고 있으면 설정 화면의 숫자가 안 올라가므로 바로 알 수 있습니다. */
-const BUILD = 'A-9';
+const BUILD = 'A-10';
 const SITE_ID = 'unseo-thetime';
 const LS_UNITS = 'ittv_units';
 const LS_CONTACTS = 'ittv_contacts';
@@ -1450,15 +1451,16 @@ function renderTodayActs(){
       <span style="font-weight:700;color:var(--muted)">없음</span></div></div>`;
     return;
   }
+  /* 대시보드 칸도 같은 색으로 — 신규 파랑 · 변경 빨강 · 취소 검정 */
   const chip = (label, list, color) => list.length
-    ? `<span class="act-chip" style="border-color:${color};color:${color}">${label} <b>${list.length}</b></span>` : '';
+    ? `<span class="act-chip" style="background:${color};border-color:${color};color:#fff">${label} <b>${list.length}</b></span>` : '';
   const hos = [...a.cancel, ...a.chg, ...a.neo]
     .sort((x,y)=>(bookingAct(y)?.last||0)-(bookingAct(x)?.last||0));
   box.innerHTML = `<div class="sec act-sec" onclick="gotoRecent()">
     <div class="sec-title">📩 오늘 예약 변동 <b style="color:var(--primary)">${n}곳</b>
       <span class="memo-go no-print">최근순 보기 ›</span></div>
     <div class="sec-body" style="padding-top:0">
-      <div class="act-chips">${chip('신규', a.neo, '#2563eb')}${chip('변경', a.chg, '#d97706')}${chip('취소', a.cancel, '#dc2626')}</div>
+      <div class="act-chips">${chip('신규', a.neo, '#2563eb')}${chip('변경', a.chg, '#dc2626')}${chip('취소', a.cancel, '#111827')}</div>
       <div class="act-list">${hos.slice(0,12).map(u=>{
         const t = bookingAct(u);
         return `<span class="act-ho">${esc(u.ho)}호 <span class="act-t">${actLabel(t)} ${agoText(t.last)}</span></span>`;
