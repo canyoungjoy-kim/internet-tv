@@ -137,6 +137,19 @@ input[type=checkbox]{width:auto;-webkit-appearance:checkbox;appearance:checkbox}
 .slot-day-head{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;background:var(--primary);color:#fff;border-radius:10px 10px 0 0;font-size:18.4px;font-weight:800}
 .slot-day-head .sd-cnt{font-size:14.9px;font-weight:700;background:rgba(255,255,255,.22);padding:3px 10px;border-radius:14px}
 .slot-row{display:flex;align-items:center;gap:9px;padding:10px 12px;border:1px solid var(--border);border-top:none;background:#fff;cursor:pointer}
+/* 예약 활동 시각 — 언제 접수·변경·취소됐는지 한 줄로 */
+.ul-act{margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.4px}
+.ac-tag{border-radius:5px;padding:1px 7px;font-weight:800;font-size:11.8px;color:#fff}
+.ac-tag.ac-n{background:#2563eb}.ac-tag.ac-c{background:#d97706}.ac-tag.ac-x{background:#dc2626}
+.ac-ago{font-weight:800;color:var(--text)}
+.ac-when{color:var(--muted);font-weight:600}
+/* 오늘 예약 변동 — 대시보드 */
+.act-sec{cursor:pointer}
+.act-chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:7px}
+.act-chip{border:2px solid;border-radius:999px;padding:2px 11px;font-size:13.6px;font-weight:800}
+.act-list{display:flex;gap:7px;flex-wrap:wrap}
+.act-ho{background:#f1f5f9;border-radius:7px;padding:3px 9px;font-size:13.4px;font-weight:800;color:var(--text)}
+.act-ho .act-t{font-weight:700;color:var(--muted);font-size:12.4px;margin-left:3px}
 /* 정원을 넘긴 시간대 — 훑어볼 때 놓치지 않도록 */
 .slot-row.over{background:#fef2f2;border-left:4px solid #dc2626}
 .slot-row.over .slot-n{color:#b91c1c;font-weight:800}
@@ -329,6 +342,9 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
       <!-- 확인이 필요한 예약 (본인확인 불일치 / 완료 후 접수) -->
       <div id="bkIssues"></div>
 
+      <!-- 오늘 들어오거나 바뀐 예약 — 누르면 세대 탭이 최근 활동순으로 열립니다 -->
+      <div id="dActs"></div>
+
       <div class="stats-grid" id="dStats"></div>
 
       <div class="sec">
@@ -362,6 +378,8 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 
     <!-- ══════════ 세대 현황 ══════════ -->
     <div class="view" id="v-units">
+      <!-- 정렬 — 「방금 어느 호실을 고쳤더라」 할 때 최근 활동순으로 봅니다 -->
+      <div class="chips" id="uSortChips"></div>
       <div class="chips" id="uFloorChips"></div>
       <div class="chips" id="uStatusChips"></div>
       <div style="display:flex;gap:7px;margin-bottom:11px">
@@ -689,7 +707,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 const APP_VERSION = 'v1.0 (2026-07-27)';
 /* 판 번호 — 파일을 바꿀 때마다 올립니다.
    기기가 옛 파일을 물고 있으면 설정 화면의 숫자가 안 올라가므로 바로 알 수 있습니다. */
-const BUILD = 'A-8';
+const BUILD = 'A-9';
 const SITE_ID = 'unseo-thetime';
 const LS_UNITS = 'ittv_units';
 const LS_CONTACTS = 'ittv_contacts';
@@ -777,6 +795,7 @@ let contacts = {};     // 호실 → { name, phone, phone4 }  — 관리자·직
 let adminNotes = {};
 let config = null;     // 설정
 let unitView = 'grid'; // grid | list
+let unitSort = 'ho';   // ho 호실순 | recent 최근 예약활동순
 let curFloor = 'all';
 let curStatus = 'all';
 let editingUnitId = null;
@@ -1419,6 +1438,38 @@ function memoCountHtml(){
   return `<span style="color:var(--text)">${all.length}건</span>`
        + (open ? ` <span style="color:var(--red)">· 교체 전 ${open}</span>` : '');
 }
+/* 오늘 들어오거나 바뀐 예약을 대시보드 맨 위에 보여줍니다.
+   숫자만 보고도 「오늘 뭔가 움직였구나」를 아시고, 누르면 바로 그 세대들로 갑니다. */
+function renderTodayActs(){
+  const box = $('dActs'); if(!box) return;
+  if(!canSeeBookings()){ box.innerHTML = ''; return; }
+  const a = todayActs();
+  const n = a.neo.length + a.chg.length + a.cancel.length;
+  if(!n){
+    box.innerHTML = `<div class="sec"><div class="sec-title">📩 오늘 예약 변동
+      <span style="font-weight:700;color:var(--muted)">없음</span></div></div>`;
+    return;
+  }
+  const chip = (label, list, color) => list.length
+    ? `<span class="act-chip" style="border-color:${color};color:${color}">${label} <b>${list.length}</b></span>` : '';
+  const hos = [...a.cancel, ...a.chg, ...a.neo]
+    .sort((x,y)=>(bookingAct(y)?.last||0)-(bookingAct(x)?.last||0));
+  box.innerHTML = `<div class="sec act-sec" onclick="gotoRecent()">
+    <div class="sec-title">📩 오늘 예약 변동 <b style="color:var(--primary)">${n}곳</b>
+      <span class="memo-go no-print">최근순 보기 ›</span></div>
+    <div class="sec-body" style="padding-top:0">
+      <div class="act-chips">${chip('신규', a.neo, '#2563eb')}${chip('변경', a.chg, '#d97706')}${chip('취소', a.cancel, '#dc2626')}</div>
+      <div class="act-list">${hos.slice(0,12).map(u=>{
+        const t = bookingAct(u);
+        return `<span class="act-ho">${esc(u.ho)}호 <span class="act-t">${actLabel(t)} ${agoText(t.last)}</span></span>`;
+      }).join('')}${hos.length>12 ? `<span class="act-ho">외 ${hos.length-12}곳</span>` : ''}</div>
+    </div></div>`;
+}
+/* 세대 탭을 최근 활동순으로 열어 드립니다 */
+function gotoRecent(){
+  unitSort = 'recent';
+  switchView('units');
+}
 function renderMemoSummary(){
   const c = $('dMemoCount');
   if(c) c.innerHTML = memoCountHtml();
@@ -1623,6 +1674,7 @@ function exportMemoCsv(){
 function renderDash(){
   renderBookingHealth();
   renderMemoSummary();
+  renderTodayActs();
   const c = counts();
   const total = activeUnits().length;
   const done = c.done||0;
@@ -1767,6 +1819,20 @@ function unitRowHtml(u, showSlot){
     <div class="ul-mid">
       <div class="ul-name">${esc(nameOf(u) || (canSeePersonal()?'(이름 없음)':u.ho+'호'))}</div>
       <div class="ul-meta">${esc(bits.filter(Boolean).join(' · ')||'—')}</div>
+      ${(()=>{
+        /* 예약 활동 시각 — 최근순으로 보실 때 「무엇이 언제」가 바로 보여야 합니다 */
+        const a = canSeeBookings() ? bookingAct(u) : null;
+        if(!a || !a.last) return '';
+        const cls = a.kind==='cancel' ? 'ac-x' : a.kind==='change' ? 'ac-c' : 'ac-n';
+        const parts = a.legacy
+          ? [`활동 ${fmtAct(a.last)}`]
+          : [ a.first ? `접수 ${fmtAct(a.first)}` : '',
+              a.chg && a.chg>a.first ? `변경 ${fmtAct(a.chg)}` : '',
+              a.cancel ? `취소 ${fmtAct(a.cancel)}` : '' ].filter(Boolean);
+        return `<div class="ul-act"><span class="ac-tag ${cls}">${actLabel(a)}</span>`
+             + `<span class="ac-ago">${agoText(a.last)}</span>`
+             + `<span class="ac-when">${esc(parts.join(' · '))}</span></div>`;
+      })()}
     </div>
     <span class="badge ${st.cls}">${st.label}</span>
     ${u.status!=='done' && u.status!=='vacant'
@@ -1786,8 +1852,20 @@ function toggleUnitView(){
   $('uViewToggle').textContent = unitView==='grid' ? '목록' : '타일';
   renderUnits();
 }
+function setUnitSort(v){ unitSort = v; renderUnits(); }
 function renderUnits(){
   const floors = floorsList();
+  /* 예약함을 못 받는 기사 계정에는 활동 시각 자체가 없으므로 정렬을 내지 않습니다 */
+  const sortBox = $('uSortChips');
+  if(sortBox){
+    if(canSeeBookings()){
+      const n = (()=>{ const a = todayActs(); return a.neo.length+a.chg.length+a.cancel.length; })();
+      sortBox.innerHTML =
+        `<button class="chip ${unitSort==='ho'?'active':''}" onclick="setUnitSort('ho')">호실순</button>`
+      + `<button class="chip ${unitSort==='recent'?'active':''}" onclick="setUnitSort('recent')">🕒 최근 예약활동순${n?' '+n:''}</button>`;
+      sortBox.style.display = '';
+    } else { sortBox.innerHTML=''; sortBox.style.display='none'; unitSort='ho'; }
+  }
   $('uFloorChips').innerHTML =
     `<button class="chip ${curFloor==='all'?'active':''}" onclick="setFloor('all')">전체 ${units.length}</button>` +
     floors.map(f=>`<button class="chip ${curFloor===f?'active':''}" onclick="setFloor(${f})">${f}층</button>`).join('');
@@ -1811,7 +1889,18 @@ function renderUnits(){
     }
     return true;
   });
-  list.sort((a,b)=> a.floor-b.floor || String(a.ho).localeCompare(String(b.ho)));
+  /* 「최근 활동순」은 예약일 순이 아닙니다.
+     예약을 넣거나 옮기거나 취소한 '그 시각' 기준입니다.
+     방금 손댄 호실이 언제나 맨 위에 옵니다. */
+  if(unitSort === 'recent'){
+    list.sort((a,b)=>{
+      const x = bookingAct(a), y = bookingAct(b);
+      return (y ? y.last : 0) - (x ? x.last : 0)
+          || a.floor-b.floor || String(a.ho).localeCompare(String(b.ho));
+    });
+  } else {
+    list.sort((a,b)=> a.floor-b.floor || String(a.ho).localeCompare(String(b.ho)));
+  }
 
   if(!list.length){
     $('uBody').innerHTML = units.length
@@ -1821,7 +1910,8 @@ function renderUnits(){
     return;
   }
 
-  if(unitView==='list'){
+  /* 최근 활동순일 때는 층으로 묶지 않습니다 — 묶으면 시간 순서가 흐트러집니다 */
+  if(unitView==='list' || unitSort==='recent'){
     $('uBody').innerHTML = `<div class="card">${list.map(u=>unitRowHtml(u,false)).join('')}</div>`;
     return;
   }
@@ -1940,6 +2030,17 @@ function openUnit(id){
           <div class="fg"><label>시간대</label><select id="umSlot"></select></div>
         </div>
         <div class="fg"><label>담당 기사</label><select id="umTech">${techOpts}</select></div>
+        ${(()=>{
+          const a = canSeeBookings() ? bookingAct(u) : null;
+          if(!a || !a.last) return '';
+          const rows = a.legacy
+            ? [['마지막 활동', a.last]]
+            : [['접수', a.first], ['변경', a.chg > a.first ? a.chg : 0], ['취소', a.cancel]];
+          const html = rows.filter(r=>r[1]).map(r=>
+            `<div><b>${r[0]}</b> ${new Date(r[1]).toLocaleString('ko-KR')}</div>`).join('');
+          return `<div class="help" style="margin:0 0 8px">${html}
+            <div style="margin-top:3px;color:var(--muted)">${esc(actLabel(a))} · ${esc(agoText(a.last))}</div></div>`;
+        })()}
         ${isAdmin() ? `<button class="btn btn-outline btn-full btn-sm" type="button"
             onclick="rebookNext()">🔄 남은 자리 중 가장 빠른 시간으로 재예약</button>` : ''}
         ${u.bookedBy==='self' ? `<div class="info">입주민이 예약 페이지에서 직접 신청했습니다${u.bookedAt?` (${esc(u.bookedAt)})`:''}</div>` : ''}
@@ -3788,7 +3889,7 @@ async function resetWorkRecords(){
   const n = units.filter(u=>u.date || u.status!=='todo').length;
   if(!confirm(`작업기록을 초기화합니다.\n\n`
     + `지웁니다 — 예약 날짜·시간 · 진행상태 · 회수/설치 체크 · 임시비번 · 입주민 메모\n`
-    + `        서버 예약함 · 잔여석 카운터\n\n`
+    + `        서버 예약함 · 잔여석 카운터 · 예약 활동 기록(접수·변경·취소 시각)\n\n`
     + `그대로 둡니다 — 세대 목록 · 이름·연락처 · 작업일·시간대·정원 · 기사 명단 · 호텔 지정\n`
     + `             🏢 관리실 메모 · 🔒 관리자 메모\n`
     + `             (세대 사정이라 2차 일정 때도 그대로 필요합니다)\n\n`
@@ -3810,7 +3911,12 @@ async function resetWorkRecords(){
     normalizeUnit(u);
     u.updatedAt = Date.now();
   });
+  /* 예약 활동 기록(접수·변경·취소 시각)은 예약함에 들어 있습니다.
+     아래에서 예약함을 통째로 지우므로 함께 없어지고,
+     「최근 예약활동순」도 정렬 기준이 사라져 호실순으로 돌아갑니다.
+     시험하며 쌓인 활동 흔적이 개시 후까지 따라오면 안 되기 때문입니다. */
   bookingIndex.clear(); bookingIssues = []; failedPushes.clear();
+  unitSort = 'ho';
   lastPub = { pub:'', avail:'', roster:'', slots:{} };
   saveLocal();
 
@@ -4368,6 +4474,56 @@ function resyncBooking(ho){
   bookingIssues = bookingIssues.filter(x=>!(x.kind==='mismatch' && x.ho===String(ho)));
   renderBookingIssues();
 }
+/* ── 예약 활동 시각 ────────────────────────────────────────
+   소장님이 「방금 어느 호실을 고쳤더라」, 「오늘 뭐가 바뀌었지」를
+   바로 아실 수 있도록, 세대별 마지막 예약 활동을 뽑아냅니다.
+   순서는 언제나 '가장 최근 활동'이 기준입니다 —
+   취소했으면 취소한 때, 옮겼으면 옮긴 때, 처음이면 접수한 때. */
+function bookingAct(u){
+  const b = bookingIndex.get(String(u.ho));
+  if(!b) return null;
+  const first  = Number(b.firstAt || 0);
+  const chg    = Number(b.chgAt || 0);
+  const cancel = Number(b.cancelAt || 0);
+  /* 옛 예약에는 이 항목들이 없습니다(그때는 안 만들었으니까).
+     그럴 때는 at 하나만 있으므로 '마지막 활동'으로만 씁니다. */
+  const legacy = !first && !chg && !cancel;
+  const last = legacy ? Number(b.at || 0) : Math.max(first, chg, cancel);
+  const kind = b.cancelled ? 'cancel' : (chg && chg > first ? 'change' : 'new');
+  return { first, chg, cancel, last, kind, legacy, cancelled: !!b.cancelled };
+}
+function actLabel(a){
+  if(!a) return '';
+  return a.kind === 'cancel' ? '취소' : a.kind === 'change' ? '변경' : '접수';
+}
+/* 「3분 전」처럼 얼마나 지났는지 — 방금 고친 호실을 찾으실 때 가장 빠릅니다 */
+function agoText(ms){
+  if(!ms) return '';
+  const s = Math.floor((Date.now() - ms) / 1000);
+  if(s < 60) return '방금';
+  if(s < 3600) return Math.floor(s/60) + '분 전';
+  if(s < 86400) return Math.floor(s/3600) + '시간 전';
+  return Math.floor(s/86400) + '일 전';
+}
+function fmtAct(ms){
+  if(!ms) return '';
+  const d = new Date(ms);
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+/* 오늘 예약 활동이 있었던 세대 — 대시보드에 숫자로 띄웁니다 */
+function todayActs(){
+  const t0 = new Date(); t0.setHours(0,0,0,0);
+  const from = t0.getTime();
+  const out = { neo:[], chg:[], cancel:[] };
+  units.forEach(u=>{
+    const a = bookingAct(u);
+    if(!a || !a.last || a.last < from) return;
+    if(a.kind === 'cancel') out.cancel.push(u);
+    else if(a.kind === 'change') out.chg.push(u);
+    else out.neo.push(u);
+  });
+  return out;
+}
 function setBookingHealth(state, msg){
   bookingHealth = state; bookingHealthMsg = msg || '';
   renderBookingHealth();
@@ -4524,14 +4680,22 @@ async function pushBookingUpdate(u, before){
   const id  = u.bookingId || `${ho}_${p4}`;
   /* 문서 전체를 새로 씁니다. 일부만 병합하면 남아 있는 옛 값 때문에
      '마지막으로 처리한 내용'과 어긋나 같은 건을 계속 다시 반영하게 됩니다. */
+  /* 사무소가 옮긴 것도 '언제 바뀌었나'에 남아야 합니다.
+     소장님이 「방금 어느 호실을 고쳤더라」 할 때 찾으시는 그 기록입니다. */
+  const nowB = Date.now();
+  const cancelling = !(u.date && u.slot);
+  const movedB = (cur.date || '') !== (u.date || '') || (cur.slot || '') !== (u.slot || '');
   const full = {
     ho, phone4: p4,
     date: u.date || '', slot: u.slot || '',
     presence: u.presence || '', pin: u.pin || '',
     note: cur.note || '',
-    cancelled: !(u.date && u.slot),
+    cancelled: cancelling,
     byOffice: true,
-    at: Date.now(),
+    at: nowB,
+    firstAt: cur.firstAt || (cancelling ? 0 : nowB),
+    chgAt: movedB && !cancelling ? nowB : (cur.chgAt || 0),
+    cancelAt: cancelling ? (movedB ? nowB : (cur.cancelAt || nowB)) : 0,
   };
   try{
     const { doc, setDoc } = window._fb;
