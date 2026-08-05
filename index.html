@@ -148,6 +148,11 @@ input[type=checkbox]{width:auto;-webkit-appearance:checkbox;appearance:checkbox}
 .act-sec{cursor:pointer}
 .act-chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:7px}
 .act-chip{border:2px solid;border-radius:999px;padding:2px 11px;font-size:13.6px;font-weight:800}
+.act-chip-go{cursor:pointer}
+.act-chip-go:active{opacity:.75}
+/* 세대 탭 위쪽 「오늘」 추림 칸 */
+.chip-sep{align-self:center;color:var(--muted);font-size:12.6px;font-weight:800;margin:0 2px 0 6px}
+.chip.act-kind{border-width:2px;font-weight:800}
 .act-list{display:flex;gap:7px;flex-wrap:wrap}
 .act-ho{background:#f1f5f9;border-radius:7px;padding:3px 9px;font-size:13.4px;font-weight:800;color:var(--text)}
 .act-ho .act-t{font-weight:700;color:var(--muted);font-size:12.4px;margin-left:3px}
@@ -247,6 +252,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 .memo-cnt{font-size:14.4px;font-weight:700;color:var(--muted);margin-left:auto}
 .memo-ho{font-size:18.4px;font-weight:800}
 .memo-when{font-size:14px;font-weight:700;color:var(--muted);margin-left:auto}
+.memo-ago{font-size:12.6px;font-weight:800;color:var(--primary);background:#eff6ff;border-radius:999px;padding:1px 8px}
 .memo-who{font-size:14.4px;font-weight:700;color:var(--muted);margin-top:2px}
 .memo-body{margin-top:5px;padding:9px 11px;background:#fffbeb;border-left:4px solid #fcd34d;
   border-radius:0 8px 8px 0;font-size:16.1px;font-weight:600;line-height:1.55;color:#78350f;
@@ -708,7 +714,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 const APP_VERSION = 'v1.0 (2026-07-27)';
 /* 판 번호 — 파일을 바꿀 때마다 올립니다.
    기기가 옛 파일을 물고 있으면 설정 화면의 숫자가 안 올라가므로 바로 알 수 있습니다. */
-const BUILD = 'A-10';
+const BUILD = 'A-11';
 const SITE_ID = 'unseo-thetime';
 const LS_UNITS = 'ittv_units';
 const LS_CONTACTS = 'ittv_contacts';
@@ -797,6 +803,11 @@ let adminNotes = {};
 let config = null;     // 설정
 let unitView = 'grid'; // grid | list
 let unitSort = 'ho';   // ho 호실순 | recent 최근 예약활동순
+/* 대시보드의 신규·변경·취소 칸을 누르면 그 종류만 남깁니다.
+   '' 전체 · 'neo' 오늘 접수 · 'chg' 오늘 변경 · 'cancel' 오늘 취소
+   ─ '오늘' 안에서만 걸러냅니다. 대시보드에 뜬 숫자가 오늘 것이므로,
+     눌러서 나온 목록의 개수가 그 숫자와 반드시 같아야 하기 때문입니다. */
+let actFilter = '';
 let curFloor = 'all';
 let curStatus = 'all';
 let editingUnitId = null;
@@ -1405,12 +1416,38 @@ function memoKindOk(u){
   return true;
 }
 
+/* 메모를 어떤 차례로 볼지 — 'ho' 예약일·호실순 / 'recent' 최근 입력순 */
+let memoSort = 'ho';
+function setMemoSort(v){ memoSort = v; renderMemos(); }
+/* 메모가 마지막으로 들어온 시각. 지금 고른 칸(전체/입주민/관리실/관리자)에 맞춰 잽니다.
+   ─ 🔒 관리자 메모는 적은 시각이 그대로 남아 있어 정확합니다.
+   ─ 💬 입주민 메모는 예약할 때 함께 적히므로 그 예약 활동 시각을 씁니다. 사실상 정확합니다.
+   ─ 🏢 관리실 메모는 따로 시각을 남기지 않아, 그 세대를 마지막으로 고친 시각으로 갈음합니다.
+     ⚠ 메모가 아닌 다른 항목(상태·일련번호 등)을 고쳐도 이 시각이 올라갑니다.
+       대강의 차례로만 보십시오. 메모 전용 시각 칸을 새로 만들려면 서버 규칙을 다시 올려야 해서,
+       개시를 코앞에 두고 손대지 않았습니다. 개시 후 여유가 생기면 정확하게 바꿀 수 있습니다. */
+function memoAt(u, kind){
+  const k = kind || memoKind;
+  const adm = () => adminNotesOf(u.ho).reduce((m,x)=>Math.max(m, Number(x.editedAt||x.at||0)), 0);
+  const res = () => { if(!residentNotes(u).length) return 0; const a = bookingAct(u); return a ? a.last : 0; };
+  const off = () => officeNotes(u).length ? Number(u.updatedAt||0) : 0;
+  if(k === 'adm') return adm();
+  if(k === 'res') return res();
+  if(k === 'off') return off();
+  return Math.max(adm(), res(), off());
+}
 /* 호실 선택 — 고른 세대만 뽑아 쓸 수 있게 합니다.
    아무것도 안 고르면 화면에 보이는 전체가 대상입니다. */
 let memoSel = new Set();
 function memoVisible(){
   const all = memoUnits().filter(memoKindOk);
-  return memoOnlyOpen ? all.filter(u=>u.status!=='done') : all;
+  const list = memoOnlyOpen ? all.filter(u=>u.status!=='done') : all;
+  /* 인쇄·뽑아쓰기도 화면과 같은 차례여야 합니다 — 그래서 여기서 한 번에 정렬합니다 */
+  if(memoSort === 'recent'){
+    return list.slice().sort((a,b)=> memoAt(b) - memoAt(a)
+      || (a.date||'9999').localeCompare(b.date||'9999') || sortBySlotThenHo(a,b));
+  }
+  return list;
 }
 // 실제로 뽑아 쓸 대상 — 선택이 있으면 선택분만, 없으면 보이는 전체
 function memoTargets(){
@@ -1451,27 +1488,38 @@ function renderTodayActs(){
       <span style="font-weight:700;color:var(--muted)">없음</span></div></div>`;
     return;
   }
-  /* 대시보드 칸도 같은 색으로 — 신규 파랑 · 변경 빨강 · 취소 검정 */
-  const chip = (label, list, color) => list.length
-    ? `<span class="act-chip" style="background:${color};border-color:${color};color:#fff">${label} <b>${list.length}</b></span>` : '';
+  /* 대시보드 칸도 같은 색으로 — 신규 파랑 · 변경 빨강 · 취소 검정.
+     칸을 누르면 그 종류만 추려 보여 드립니다(칸 전체를 누르면 셋 다).
+     stopPropagation 이 없으면 바깥 칸의 '전체 보기'가 함께 걸려
+     기껏 고른 종류가 곧바로 풀려 버립니다. */
+  const chip = (label, list, color, k) => list.length
+    ? `<span class="act-chip act-chip-go" style="background:${color};border-color:${color};color:#fff"
+         onclick="event.stopPropagation();gotoRecent('${k}')">${label} <b>${list.length}</b></span>` : '';
   const hos = [...a.cancel, ...a.chg, ...a.neo]
     .sort((x,y)=>(bookingAct(y)?.last||0)-(bookingAct(x)?.last||0));
   box.innerHTML = `<div class="sec act-sec" onclick="gotoRecent()">
     <div class="sec-title">📩 오늘 예약 변동 <b style="color:var(--primary)">${n}곳</b>
       <span class="memo-go no-print">최근순 보기 ›</span></div>
     <div class="sec-body" style="padding-top:0">
-      <div class="act-chips">${chip('신규', a.neo, '#2563eb')}${chip('변경', a.chg, '#dc2626')}${chip('취소', a.cancel, '#111827')}</div>
+      <div class="act-chips">${chip('신규', a.neo, '#2563eb', 'neo')}${chip('변경', a.chg, '#dc2626', 'chg')}${chip('취소', a.cancel, '#111827', 'cancel')}</div>
       <div class="act-list">${hos.slice(0,12).map(u=>{
         const t = bookingAct(u);
         return `<span class="act-ho">${esc(u.ho)}호 <span class="act-t">${actLabel(t)} ${agoText(t.last)}</span></span>`;
       }).join('')}${hos.length>12 ? `<span class="act-ho">외 ${hos.length-12}곳</span>` : ''}</div>
     </div></div>`;
 }
-/* 세대 탭을 최근 활동순으로 열어 드립니다 */
-function gotoRecent(){
+/* 세대 탭을 최근 활동순으로 열어 드립니다.
+   kind 를 주면 그 종류(오늘 접수·변경·취소)만 남깁니다.
+   ─ 층·상태·검색어를 함께 풀어 줍니다. 아까 3층만 보시던 채로 넘어오면
+     오늘 변동이 3층에 없을 때 빈 화면이 떠서, 눌러도 아무 일도 안 난 것처럼 보입니다. */
+function gotoRecent(kind){
   unitSort = 'recent';
+  actFilter = kind || '';
+  if(actFilter){ curFloor = 'all'; curStatus = 'all'; const s = $('uSearch'); if(s) s.value = ''; }
   switchView('units');
 }
+function setActFilter(k){ actFilter = k || ''; if(k) unitSort = 'recent'; renderUnits(); }
+const ACT_KIND = { neo:{label:'신규', color:'#2563eb'}, chg:{label:'변경', color:'#dc2626'}, cancel:{label:'취소', color:'#111827'} };
 function renderMemoSummary(){
   const c = $('dMemoCount');
   if(c) c.innerHTML = memoCountHtml();
@@ -1492,7 +1540,7 @@ function renderMemos(){
   if(!isAdmin() && memoKind === 'adm') memoKind = 'all';
 
   const all = memoUnits().filter(memoKindOk);
-  const list = memoOnlyOpen ? all.filter(u=>u.status!=='done') : all;
+  const list = memoVisible();
   const open = all.filter(u=>u.status!=='done').length;
 
   const kindBox = $('dMemoKind');
@@ -1503,9 +1551,12 @@ function renderMemos(){
     const nAdm = mu.filter(u=>adminNotesOf(u.ho).length).length;
     const chip = (k,label,n)=>`<button class="btn btn-sm ${memoKind===k?'btn-primary':'btn-outline'}"
         onclick="setMemoKind('${k}')">${label}${n!==null?` ${n}`:''}</button>`;
+    /* 차례 고르기 — 고른 칸(입주민/관리실/관리자)에 맞춰 그 메모의 입력 시각으로 셉니다 */
+    const sc = (v,label)=>`<button class="chip ${memoSort===v?'active':''}" onclick="setMemoSort('${v}')">${label}</button>`;
     kindBox.innerHTML = `<div class="memo-bar" style="gap:6px">
       ${chip('all','전체',null)}${chip('res','💬 입주민',nRes)}${chip('off','🏢 관리실',nOff)}`
-      + `${isAdmin()?chip('adm','🔒 관리자',nAdm):''}</div>`;
+      + `${isAdmin()?chip('adm','🔒 관리자',nAdm):''}</div>`
+      + `<div class="chips no-print" style="margin-top:6px">${sc('ho','예약일순')}${sc('recent','🕒 최근 입력순')}</div>`;
     kindBox.style.display = '';
   }
 
@@ -1534,12 +1585,14 @@ function renderMemos(){
       ? [nameOf(u), phoneOf(u)].filter(Boolean).join(' · ')
       : '';
     const on = memoSel.has(u.id);
+    const mAt = memoAt(u);
     return `<div class="memo-item ${on?'picked':''}" onclick="openUnit('${u.id}')">
       <div class="memo-head">
         <span class="memo-chk ${on?'on':''}" onclick="toggleMemoPick(event,'${u.id}')">${on?'✓':''}</span>
         <span class="memo-ho">${esc(u.ho)}호</span>
         <span class="badge ${STATUS[u.status].cls}">${STATUS[u.status].label}</span>
         <span class="memo-when">${esc(when)}</span>
+        ${mAt ? `<span class="memo-ago no-print">🕒 ${agoText(mAt)}</span>` : ''}
       </div>
       ${who ? `<div class="memo-who">${esc(who)}</div>` : ''}
       ${(memoKind==='all'||memoKind==='res') ? residentNotes(u).map(t=>`<div class="memo-body">💬 “${esc(t)}”</div>`).join('') : ''}
@@ -1854,19 +1907,36 @@ function toggleUnitView(){
   $('uViewToggle').textContent = unitView==='grid' ? '목록' : '타일';
   renderUnits();
 }
-function setUnitSort(v){ unitSort = v; renderUnits(); }
+/* 호실순으로 되돌리면 오늘 종류 추림도 함께 풉니다 —
+   호실순인데 '오늘 취소한 세대'만 남아 있으면 무엇을 보고 있는지 알 수 없습니다. */
+function setUnitSort(v){ unitSort = v; if(v !== 'recent') actFilter = ''; renderUnits(); }
 function renderUnits(){
   const floors = floorsList();
   /* 예약함을 못 받는 기사 계정에는 활동 시각 자체가 없으므로 정렬을 내지 않습니다 */
   const sortBox = $('uSortChips');
+  const today = canSeeBookings() ? todayActs() : { neo:[], chg:[], cancel:[] };
+  /* 고른 종류가 오늘 하나도 없어졌다면(자정이 지났거나 초기화했거나) 조용히 풉니다.
+     ⚠ 반드시 칸을 그리기 '전'에 — 뒤에서 풀면 그 회차 화면만 어긋납니다. */
+  if(actFilter && !today[actFilter].length) actFilter = '';
   if(sortBox){
     if(canSeeBookings()){
-      const n = (()=>{ const a = todayActs(); return a.neo.length+a.chg.length+a.cancel.length; })();
+      const n = today.neo.length + today.chg.length + today.cancel.length;
+      /* 오늘 변동 칸 — 대시보드에서 누른 종류가 여기서도 켜져 보여야
+         지금 무엇만 보고 있는지 헷갈리지 않습니다. */
+      const kchip = (k) => {
+        const c = ACT_KIND[k], m = today[k].length;
+        if(!m) return '';
+        const on = actFilter === k;
+        return `<button class="chip act-kind ${on?'on':''}"
+          style="${on?`background:${c.color};border-color:${c.color};color:#fff`:`border-color:${c.color};color:${c.color}`}"
+          onclick="setActFilter('${on?'':k}')">${c.label} ${m}</button>`;
+      };
       sortBox.innerHTML =
         `<button class="chip ${unitSort==='ho'?'active':''}" onclick="setUnitSort('ho')">호실순</button>`
-      + `<button class="chip ${unitSort==='recent'?'active':''}" onclick="setUnitSort('recent')">🕒 최근 예약활동순${n?' '+n:''}</button>`;
+      + `<button class="chip ${unitSort==='recent'&&!actFilter?'active':''}" onclick="setUnitSort('recent')">🕒 최근 예약활동순${n?' '+n:''}</button>`
+      + (n ? `<span class="chip-sep">오늘</span>` + kchip('neo') + kchip('chg') + kchip('cancel') : '');
       sortBox.style.display = '';
-    } else { sortBox.innerHTML=''; sortBox.style.display='none'; unitSort='ho'; }
+    } else { sortBox.innerHTML=''; sortBox.style.display='none'; unitSort='ho'; actFilter=''; }
   }
   $('uFloorChips').innerHTML =
     `<button class="chip ${curFloor==='all'?'active':''}" onclick="setFloor('all')">전체 ${units.length}</button>` +
@@ -1882,7 +1952,10 @@ function renderUnits(){
     : '';
 
   const q = ($('uSearch').value||'').trim().toLowerCase();
+  /* 대시보드에서 누른 종류만 남깁니다 — 대상은 오늘 그 활동이 있었던 세대뿐입니다 */
+  const only = actFilter ? new Set(today[actFilter].map(u=>u.id)) : null;
   let list = units.filter(u=>{
+    if(only && !only.has(u.id)) return false;
     if(curFloor!=='all' && u.floor!==curFloor) return false;
     if(curStatus!=='all' && u.status!==curStatus) return false;
     if(q){
@@ -1905,7 +1978,10 @@ function renderUnits(){
   }
 
   if(!list.length){
-    $('uBody').innerHTML = units.length
+    $('uBody').innerHTML = actFilter
+      ? `<div class="empty"><div class="ico">🔍</div><p>오늘 ${ACT_KIND[actFilter].label}된 세대가 없습니다</p>
+         <button class="btn btn-outline btn-sm" style="margin-top:12px" onclick="setActFilter('')">전체 보기</button></div>`
+      : units.length
       ? `<div class="empty"><div class="ico">🔍</div><p>조건에 맞는 세대가 없습니다</p></div>`
       : `<div class="empty"><div class="ico">🏢</div><p>등록된 세대가 없습니다<br>설정 → 세대 생성에서 만들어 주세요</p>
          <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="switchView('settings')">설정으로 가기</button></div>`;
@@ -3918,7 +3994,7 @@ async function resetWorkRecords(){
      「최근 예약활동순」도 정렬 기준이 사라져 호실순으로 돌아갑니다.
      시험하며 쌓인 활동 흔적이 개시 후까지 따라오면 안 되기 때문입니다. */
   bookingIndex.clear(); bookingIssues = []; failedPushes.clear();
-  unitSort = 'ho';
+  unitSort = 'ho'; actFilter = ''; memoSort = 'ho';
   lastPub = { pub:'', avail:'', roster:'', slots:{} };
   saveLocal();
 
