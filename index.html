@@ -253,6 +253,13 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 .memo-ho{font-size:18.4px;font-weight:800}
 .memo-when{font-size:14px;font-weight:700;color:var(--muted);margin-left:auto}
 .memo-ago{font-size:12.6px;font-weight:800;color:var(--primary);background:#eff6ff;border-radius:999px;padding:1px 8px}
+/* 🔒 사무소 전용 작업일 — 입주민에게 내보내지 않는 날 */
+.day-row{margin-bottom:9px;padding:7px;border:1.5px solid var(--line);border-radius:9px}
+.day-row.office{background:#fffbeb;border-color:#f59e0b}
+.day-off{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13.2px;font-weight:700;color:var(--muted);cursor:pointer}
+.day-off input{width:17px;height:17px}
+.day-row.office .day-off{color:#92400e}
+.sd-off{background:#f59e0b;color:#fff;border-radius:999px;padding:1px 8px;font-size:12.4px;font-weight:800;margin-left:5px}
 .memo-who{font-size:14.4px;font-weight:700;color:var(--muted);margin-top:2px}
 .memo-body{margin-top:5px;padding:9px 11px;background:#fffbeb;border-left:4px solid #fcd34d;
   border-radius:0 8px 8px 0;font-size:16.1px;font-weight:600;line-height:1.55;color:#78350f;
@@ -531,6 +538,15 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
           <button class="btn btn-outline btn-full" onclick="exportEquipCsv()">⬇ 장비 회수대장 CSV (정산용)</button>
           <button class="btn btn-outline btn-full" onclick="exportUnbookedCsv()">⬇ 미예약 세대 CSV (독촉 문자용)</button>
           <button class="btn btn-outline btn-full" onclick="copyUnbookedPhones()">📋 미예약 세대 연락처만 복사</button>
+          <div class="help" style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
+            <strong>2차 일정 안내용</strong> — 공식 작업기간이 끝난 뒤 <strong>아직 교체를 못 받으신 세대</strong> 전부를 뽑습니다.
+            위의 「미예약 세대」와 다릅니다: 미예약 세대는 <strong>예약을 아예 안 하신 분</strong>만 나오고,
+            <strong>예약은 하셨는데 부재 등으로 작업이 안 된 세대는 빠집니다.</strong>
+            2차 문자를 보내실 때는 반드시 아래 것을 쓰세요.
+          </div>
+          <div id="pendingCnt"></div>
+          <button class="btn btn-outline btn-full" onclick="exportPendingCsv()">⬇ 미완료 세대 CSV (2차 예약 안내용)</button>
+          <button class="btn btn-outline btn-full" onclick="copyPendingPhones()">📋 미완료 세대 연락처만 복사</button>
           <div class="fg">
             <label>재실유형 일괄 지정 (호실 번호를 쉼표나 줄바꿈으로 구분)</label>
             <textarea id="bulkPresHos" placeholder="예) 201, 305, 412&#10;806&#10;1004"></textarea>
@@ -714,7 +730,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 const APP_VERSION = 'v1.0 (2026-07-27)';
 /* 판 번호 — 파일을 바꿀 때마다 올립니다.
    기기가 옛 파일을 물고 있으면 설정 화면의 숫자가 안 올라가므로 바로 알 수 있습니다. */
-const BUILD = 'A-11';
+const BUILD = 'A-13';
 const SITE_ID = 'unseo-thetime';
 const LS_UNITS = 'ittv_units';
 const LS_CONTACTS = 'ittv_contacts';
@@ -982,6 +998,19 @@ function slotKindOf(dateStr){
 function slotsForDate(dateStr){
   if(!config) return [];
   return config.slots[slotKindOf(dateStr)] || [];
+}
+/* 🔒 사무소 전용 작업일.
+   공식 예약 기간이 끝난 뒤 관리실 직원이 남은 세대를 돌 때 쓰는 날입니다.
+   사무소 화면에서는 보통 작업일과 똑같이 씁니다 — 일정표·일괄배정·작업요청서 전부.
+   다만 입주민 예약 페이지로는 이 날짜를 '보내지 않습니다'.
+   감추는 것이 아니라 존재를 알리지 않는 것이라, 주소를 직접 쳐도 고를 수 없습니다. */
+function isOfficeDay(dateStr){
+  const d = (config && config.days || []).find(x=>x && x.date === dateStr);
+  return !!(d && d.office);
+}
+/* 입주민에게 열어 주는 작업일 (사무소 전용은 뺍니다) */
+function openDays(){
+  return (config && config.days || []).filter(d=>d && d.date && !d.office);
 }
 
 /* 예전 설정(평일/주말 2종)을 평일·토·일 3종으로 자동 변환.
@@ -2416,7 +2445,8 @@ function renderSched(){
       const unassigned = dayList.filter(u=>!u.slot).length + strandedHere.length;
       return `<div class="slot-day">
         <div class="slot-day-head">
-          <span>${fmtDate(d.date)} ${SLOT_KIND_LABEL[slotKindOf(d.date)]}</span>
+          <span>${fmtDate(d.date)} ${SLOT_KIND_LABEL[slotKindOf(d.date)]}${
+            d.office ? ' <span class="sd-off">🔒 사무소 전용</span>' : ''}</span>
           <span class="sd-cnt">${dayList.length} / 정원 ${cap}</span>
         </div>
         ${rows || '<div class="slot-row">시간대가 없습니다</div>'}
@@ -3400,6 +3430,57 @@ function exportUnbookedCsv(){
                              PRESENCE[u.presence]||'', u.note||'']));
   downloadCsv(`미예약세대_${todayStr()}.csv`, rows);
 }
+/* 2차 일정 안내 대상 — 아직 교체를 못 받으신 세대 전부.
+   ⚠ 위의 unbookedUnits() 와 다릅니다. 그쪽은 '날짜가 비어 있는' 세대만 봅니다.
+     공식 기간이 끝나면 미완료 세대는 두 갈래로 갈립니다.
+       ① 예약을 아예 안 하신 세대            → date 없음
+       ② 예약은 하셨는데 작업이 안 된 세대   → date 가 지난 작업일로 남아 있음
+                                              (부재 · 문이 안 열림 · 시간이 밀려 못 감)
+     ②가 사실 가장 급한 분들인데 unbookedUnits() 로는 한 곳도 안 잡힙니다.
+     그대로 문자를 돌리면 그분들만 조용히 빠집니다.
+   앞으로 잡힌 예약이 있는 세대는 뺍니다 — 아직 기다리시면 되는 분들이라
+   2차 안내를 보내면 오히려 혼선이 생깁니다. */
+function pendingUnits(){
+  const t = todayStr();
+  return units.filter(u=>{
+    if(u.status === 'done') return false;
+    if(['hold','vacant'].includes(u.status)) return false;
+    if(u.date && u.date >= t) return false;      // 앞으로 방문 예정 — 아직 안내 대상 아님
+    return true;
+  }).sort((a,b)=>a.floor-b.floor||String(a.ho).localeCompare(String(b.ho)));
+}
+/* 왜 미완료인지 한 줄로 — 문자 문구를 나누실 때 씁니다 */
+function pendingWhy(u){
+  if(!u.date) return '예약 안 함';
+  return `${fmtDate(u.date)} 예약했으나 미완료`;
+}
+function renderPendingCount(){
+  const box = $('pendingCnt'); if(!box) return;
+  const list = pendingUnits();
+  if(!list.length){ box.innerHTML = `<div class="info" style="margin-bottom:7px">교체를 못 받으신 세대가 없습니다</div>`; return; }
+  const never = list.filter(u=>!u.date).length;
+  const miss  = list.length - never;
+  box.innerHTML = `<div class="${miss?'warn':'info'}" style="margin-bottom:7px">
+    미완료 <strong>${list.length}세대</strong>
+    — 예약 안 하신 곳 <strong>${never}</strong>
+    · 예약했는데 작업이 안 된 곳 <strong>${miss}</strong></div>`;
+}
+function exportPendingCsv(){
+  const list = pendingUnits();
+  if(!list.length) return toast('교체를 못 받으신 세대가 없습니다');
+  const rows = [['호실','이름','연락처','상태','재실유형','미완료 사유','메모']];
+  list.forEach(u=>rows.push([u.ho, nameOf(u), phoneOf(u), STATUS[u.status].label,
+                             PRESENCE[u.presence]||'', pendingWhy(u), u.note||'']));
+  downloadCsv(`미완료세대_${todayStr()}.csv`, rows);
+}
+function copyPendingPhones(){
+  const list = pendingUnits().filter(u=>phoneOf(u));
+  if(!list.length) return toast('연락처가 있는 미완료 세대가 없습니다');
+  const text = list.map(u=>phoneOf(u)).join(', ');
+  const done = ()=>toast(`${list.length}건 복사 — 문자앱 받는사람에 붙여넣으세요`, 4000);
+  if(navigator.clipboard) navigator.clipboard.writeText(text).then(done).catch(()=>prompt('복사하세요', text));
+  else prompt('복사하세요', text);
+}
 function copyUnbookedPhones(){
   const list = unbookedUnits().filter(u=>phoneOf(u));
   if(!list.length) return toast('연락처가 있는 미예약 세대가 없습니다');
@@ -3593,7 +3674,8 @@ function renderSettings(){
 
   // 작업일
   $('cfgDays').innerHTML = config.days.map((d,i)=>`
-    <div style="display:flex;gap:7px;align-items:center;margin-bottom:7px">
+    <div class="day-row ${d.office?'office':''}">
+     <div style="display:flex;gap:7px;align-items:center">
       <input type="date" value="${escA(d.date||'')}" onchange="setDay(${i}, this.value)" style="flex:1">
       <select onchange="setDayKind(${i}, this.value)" title="이 날짜가 쓸 시간대"
               style="padding:8px;min-width:96px;font-weight:800">
@@ -3605,6 +3687,10 @@ function renderSettings(){
               +' · '+slotsForDate(d.date).length+'개'
             : '시간대 없음') : ''}</span>
       <button class="btn btn-outline btn-sm" onclick="delDay(${i})" style="color:var(--red)">삭제</button>
+     </div>
+     <label class="day-off"><input type="checkbox" ${d.office?'checked':''}
+        onchange="setDayOffice(${i}, this.checked)"> 🔒 사무소 전용 — 입주민 예약 페이지에 내보내지 않음${
+        d.office ? ` <b>· ${units.filter(u=>u.date===d.date).length}세대 배정됨</b>` : ''}</label>
     </div>`).join('');
 
   // 시간대
@@ -3639,14 +3725,23 @@ function renderSettings(){
       </div>`).join('');
   });
 
-  // 정원 점검
+  /* 정원 점검.
+     ⚠ 「입주민이 고를 수 있는 정원」과 「사무소 전용 정원」을 반드시 나눠 봅니다.
+       합쳐서 여유가 있어도, 입주민 몫이 모자라면 예약 페이지가 먼저 마감되고
+       전화가 사무소로 몰립니다. 합계만 보면 그걸 못 봅니다. */
   const totalActive = units.filter(u=>u.status!=='vacant').length;
-  const totalCap = config.days.filter(d=>d.date)
-    .reduce((s,d)=>s+slotsForDate(d.date).reduce((a,x)=>a+(Number(x.cap)||0),0),0);
+  const capOf = list => list.reduce((s,d)=>s+slotsForDate(d.date).reduce((a,x)=>a+(Number(x.cap)||0),0),0);
+  const openCap = capOf(openDays());
+  const offCap  = capOf(config.days.filter(d=>d.date && d.office));
+  const totalCap = openCap + offCap;
+  renderPendingCount();
   $('capCheck').innerHTML = totalActive ? `
     <div class="${totalCap>=totalActive?'info':'warn'}">
       작업 대상 <strong>${totalActive}세대</strong> / 전체 정원 <strong>${totalCap}세대</strong>
       ${totalCap>=totalActive ? ' — 여유 '+(totalCap-totalActive)+'세대' : ' — <strong>'+(totalActive-totalCap)+'세대가 부족합니다.</strong> 작업일이나 정원을 늘리세요.'}
+      ${offCap ? `<div style="margin-top:5px;font-weight:800">
+          · 입주민이 고를 수 있는 정원 <strong>${openCap}세대</strong>
+          · 🔒 사무소 전용 <strong>${offCap}세대</strong></div>` : ''}
     </div>` : '';
 
   // 층 규칙
@@ -3743,6 +3838,30 @@ function delDay(i){
   releaseUnits(list, `${fmtDate(d.date)} 작업일 삭제로 예약 해제`);
   config.days.splice(i,1); config.updatedAt=Date.now();
   saveLocal(); pushConfig(); resetSlotCounters(); renderSettings();
+}
+/* 🔒 사무소 전용으로 돌리거나 되돌립니다.
+   ─ 전용으로 돌려도 이미 그 날짜에 잡힌 예약은 건드리지 않습니다.
+     예약을 지우면 입주민에게 안내 없이 약속이 사라지는데, 그건 절대 안 됩니다.
+     대신 이미 입주민이 잡아 둔 예약이 있으면 먼저 알려 드립니다 — 그 세대는
+     예약 페이지에서 자기 예약 시간을 못 보게 되기 때문입니다. */
+function setDayOffice(i, on){
+  const d = config.days[i];
+  if(!d) return;
+  if(on && d.date){
+    const mine = units.filter(u=>u.date===d.date).length;
+    const res  = [...bookingIndex.values()].filter(b=>b.date===d.date && !b.cancelled && !b.byOffice).length;
+    if(res && !confirm(
+        `${fmtDate(d.date)} 를 🔒 사무소 전용으로 돌립니다.\n\n`
+      + `이 날짜는 입주민 예약 페이지에서 사라지고, 아무도 새로 예약할 수 없게 됩니다.\n`
+      + `이미 잡힌 ${mine}세대의 예약은 그대로 두며, 기사도 그대로 방문합니다.\n\n`
+      + `다만 입주민이 직접 넣은 예약 ${res}건이 있습니다.\n`
+      + `그 세대는 예약 페이지에서 자기 예약 시간을 확인할 수 없게 됩니다.\n`
+      + `(「관리사무소에서 일정을 잡아 드린 건입니다」로 안내됩니다)\n\n계속할까요?`)) { renderSettings(); return; }
+  }
+  d.office = !!on;
+  config.updatedAt = Date.now();
+  saveLocal(); pushConfig(); resetSlotCounters(); renderSettings();
+  toast(on ? `${fmtDate(d.date)} 는 입주민에게 보이지 않습니다` : `${fmtDate(d.date)} 를 입주민에게 열었습니다`, 3200);
 }
 function addWorkDay(){ config.days.push({date:'',note:''}); config.updatedAt=Date.now(); saveLocal(); renderSettings(); }
 /* 작업일·시간대·정원을 고치면 잔여석 카운터를 통째로 다시 맞춥니다.
@@ -5037,8 +5156,14 @@ async function publishPublic(force){
       siteName: config.siteName,
       bookingOpen: !!config.bookingOpen,
       /* 날짜마다 어느 시간대 묶음을 쓰는지 함께 올립니다.
-         이게 없으면 입주민 화면은 요일로만 판단해, 사무소 화면과 시간이 어긋납니다. */
-      days: config.days.filter(d=>d.date).map(d=>({ date:d.date, kind:slotKindOf(d.date) })),
+         이게 없으면 입주민 화면은 요일로만 판단해, 사무소 화면과 시간이 어긋납니다.
+
+         🔒 「사무소 전용」 작업일은 여기서 아예 빼고 올립니다.
+         감추는 것이 아니라 보내지 않는 것입니다 — 입주민 기기에는 그 날짜가
+         존재조차 하지 않으므로 고를 수도, 주소를 직접 쳐서 들어올 수도 없습니다.
+         화면을 오래 열어두어 옛 목록이 남아 있더라도, 예약 페이지가 보내기 직전에
+         공개정보를 다시 읽어 「없는 날짜」로 막습니다(doSubmit 의 days 확인). */
+      days: openDays().map(d=>({ date:d.date, kind:slotKindOf(d.date) })),
       slots: config.slots,
       // 호텔 운영 호실 — 입주민 예약 페이지에서 신청을 막습니다(사무소가 직접 조율)
       hotelHos: units.filter(u=>isHotel(u.presence)).map(u=>String(u.ho)).sort(),
