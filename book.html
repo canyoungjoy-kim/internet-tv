@@ -241,7 +241,7 @@ footer{text-align:center;padding:20px 18px;color:var(--muted);font-size:13.5px;l
         <div class="notice">예약하신 시간대에 <strong>반드시 세대에 계셔야</strong> 작업이 가능합니다. 시간 변경이 필요하시면 아래 버튼을 눌러 다시 선택해 주세요.</div>
         <button class="btn btn-outline" onclick="restart()">예약 시간 변경하기</button>
         <button class="btn btn-outline" onclick="cancelBooking()" style="color:#b91c1c">예약 취소하기</button>
-        <div class="tiny">예약 취소·변경은 예약 당일 아침 7시까지이며,<br>이후에는 불가합니다.</div>
+        <div class="tiny">예약 취소·변경은 <b>방문날짜 당일 아침 7시</b>까지이며,<br>이후에는 불가합니다.</div>
       </div>
     </div>
 
@@ -249,7 +249,7 @@ footer{text-align:center;padding:20px 18px;color:var(--muted);font-size:13.5px;l
 
   <footer>
     <strong style="font-size:16px;color:var(--text)">문의 · 관리사무소 <a href="tel:0327105679" style="color:var(--primary)">032-710-5679</a></strong><br>
-    예약 취소·변경은 예약 당일 아침 7시까지이며, 이후에는 불가합니다.<br>
+    예약 취소·변경은 <b>방문날짜 당일 아침 7시</b>까지이며, 이후에는 불가합니다.<br>
     입력하신 정보는 장비교체 작업에만 사용되며, 작업 종료 후 폐기됩니다.
     <!-- 판 번호 — 기기가 옛 파일을 물고 있는지 눈으로 확인하는 용도입니다.
          파일을 바꿀 때마다 이 숫자를 올립니다. -->
@@ -260,7 +260,7 @@ footer{text-align:center;padding:20px 18px;color:var(--muted);font-size:13.5px;l
 <script>
 /* 판 번호 — 파일을 바꿀 때마다 올립니다.
    휴대폰이 옛 파일을 물고 있으면 여기 숫자가 안 올라가므로 바로 알 수 있습니다. */
-const BUILD = 'B-7';
+const BUILD = 'B-8';
 const SITE_ID = 'unseo-thetime';
 const FB_VER = '10.12.2';
 const DOW = ['일','월','화','수','목','금','토'];
@@ -291,9 +291,11 @@ function seoulParts(){
 // 오늘(서울 기준) 이전 날짜는 예약 대상에서 제외
 function todayStr(){ return seoulParts().date; }
 
-/* 예약 변경·취소 마감 — 예약 당일 아침 7시 (서울 기준) */
+/* 예약 변경·취소 마감 — 방문날짜 당일 아침 7시 (서울 기준).
+   ⚠ 「예약 당일」이라고 쓰면 '예약을 신청한 날'로 읽으시는 분이 많습니다.
+     실제로는 기사가 찾아가는 날이므로 화면 문구는 모두 「방문날짜 당일」로 적습니다. */
 const CUTOFF_HOUR = 7;
-const CUTOFF_TEXT = '예약 취소·변경은 예약 당일 아침 7시까지이며, 이후에는 불가합니다.';
+const CUTOFF_TEXT = '예약 취소·변경은 방문날짜 당일 아침 7시까지이며, 이후에는 불가합니다.';
 function isLocked(date){
   if(!date) return false;
   const now = seoulParts();
@@ -585,7 +587,7 @@ function showMyBooking(){
     ? '임시 비밀번호를 남기신 것으로 접수되었습니다.'
     : '예약 시간대에 세대에 계셔야 작업이 가능합니다.';
 
-  /* 예약 당일 아침 7시가 지나면 온라인 변경·취소를 막습니다.
+  /* 방문날짜 당일 아침 7시가 지나면 온라인 변경·취소를 막습니다.
      단 이미 지나간 예약이라면 '새 일정으로 다시 예약'은 열어 둡니다. */
   const finished = !byOffice && isFinished(myBooking.date);
   const locked   = !byOffice && !finished && isLocked(myBooking.date);
@@ -611,10 +613,10 @@ function showMyBooking(){
     $('curCutoff').textContent = '';
   }else if(locked){
     $('curLocked').textContent =
-      '예약 당일 아침 7시가 지나 온라인 변경·취소가 마감되었습니다.\n부득이한 사정이 있으시면 관리사무소(032-710-5679)로 연락해 주세요.';
+      '방문날짜 당일 아침 7시가 지나 온라인 변경·취소가 마감되었습니다.\n부득이한 사정이 있으시면 관리사무소(032-710-5679)로 연락해 주세요.';
     $('curCutoff').textContent = '';
   }else{
-    $('curCutoff').innerHTML = '예약 취소·변경은 예약 당일 아침 7시까지이며,<br>이후에는 불가합니다.';
+    $('curCutoff').innerHTML = '예약 취소·변경은 <b>방문날짜 당일 아침 7시</b>까지이며,<br>이후에는 불가합니다.';
   }
 
   ['stepMode','stepDay','stepSlot','stepSubmit','stepDone'].forEach(x=>$(x).classList.add('hide'));
@@ -717,7 +719,7 @@ async function doSubmit(){
     return fail('선택하신 날짜는 아침 7시가 지나 접수가 마감되었습니다.\n다른 날짜를 선택하시거나 관리사무소(032-710-5679)로 연락해 주세요.');
   }
   if(myBooking && !myBooking.cancelled && !isFinished(myBooking.date) && isLocked(myBooking.date)){
-    return fail('예약 당일 아침 7시가 지나 변경이 마감되었습니다.\n관리사무소(032-710-5679)로 연락해 주세요.');
+    return fail('방문날짜 당일 아침 7시가 지나 변경이 마감되었습니다.\n관리사무소(032-710-5679)로 연락해 주세요.');
   }
   if(sel.mode==='pin'){
     const pin = $('inPin').value.trim();
@@ -883,7 +885,7 @@ async function cancelBooking(){
     return;
   }
   if(isLocked(myBooking.date)){
-    alert('예약 당일 아침 7시가 지나 온라인 취소가 마감되었습니다.\n관리사무소(032-710-5679)로 연락해 주세요.');
+    alert('방문날짜 당일 아침 7시가 지나 온라인 취소가 마감되었습니다.\n관리사무소(032-710-5679)로 연락해 주세요.');
     showMyBooking();
     return;
   }
