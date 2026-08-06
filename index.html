@@ -257,6 +257,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 .pin-box{margin-top:12px;border:2px solid #b91c1c;background:#fef2f2;border-radius:10px;padding:10px 12px}
 .pin-t{font-size:15px;font-weight:800;color:#b91c1c;margin-bottom:5px}
 .pin-h{font-size:13.4px;line-height:1.6;color:#4b5563;margin-bottom:8px}
+.pin-when{margin:6px 0;padding:7px 9px;background:#fff;border:1px solid #fca5a5;border-radius:6px;color:#7f1d1d}
 .pin-btn{background:#b91c1c;color:#fff}
 /* 🔒 사무소 전용 작업일 — 입주민에게 내보내지 않는 날 */
 .day-row{margin-bottom:9px;padding:7px;border:1.5px solid var(--line);border-radius:9px}
@@ -554,15 +555,21 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
           <button class="btn btn-outline btn-full" onclick="copyPendingPhones()">📋 미완료 세대 연락처만 복사</button>
 
           <div class="pin-box admin-only">
-            <div class="pin-t">🔐 도어락 임시 비밀번호 — 작업 전에 받아두세요</div>
+            <div class="pin-t">🔐 도어락 임시 비밀번호 — 입주민이 잊었을 때를 대비한 보관본</div>
             <div class="pin-h">
               부재중 작업으로 <strong>임시 비밀번호를 남기신 세대</strong>만 뽑습니다.
               비밀번호는 <strong>작업완료 처리하는 순간 서버에서 지워집니다.</strong>
-              기사가 현장에서 번호를 잊었을 때 확인할 방법이 없어지므로,
-              <strong>작업일 아침에 한 번</strong> 받아두시길 권합니다.
-              <br><strong style="color:#b91c1c">이 파일은 남의 집 현관을 여는 번호입니다.</strong>
-              소장님 컴퓨터에만 두시고, 카톡·메일로 보내지 마시고,
-              <strong>작업이 끝나면 즉시 지워 주세요.</strong>
+              그런데 그 뒤에 <strong>입주민이 자기가 만든 임시 비밀번호를 잊고 연락해 오시면,
+              사무소도 알려드릴 방법이 없어 도어락을 강제 철거하는 수밖에 없습니다.</strong>
+              그때 알려드리려고 미리 받아 두는 파일입니다.
+              <div class="pin-when">
+                <strong>작업일마다 아침에 한 번씩</strong> 받아 모아 두세요.
+                한 번만 받으면 그 뒤에 들어온 예약분이 빠집니다.<br>
+                <strong>작업이 끝나도 바로 지우지 마시고</strong>, 문의가 잦아드는
+                <strong>2~3주 뒤에 파기</strong>하시면 됩니다.
+              </div>
+              <strong style="color:#b91c1c">이 파일은 남의 집 현관을 여는 번호입니다.</strong>
+              소장님 컴퓨터에만 두시고, 카톡·메일·USB 로 옮기지 마세요.
             </div>
             <div id="pinCnt"></div>
             <button class="btn btn-full pin-btn" onclick="exportPinCsv()">🔐 임시 비밀번호 CSV 내려받기 (관리자 전용)</button>
@@ -750,7 +757,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 const APP_VERSION = 'v1.0 (2026-07-27)';
 /* 판 번호 — 파일을 바꿀 때마다 올립니다.
    기기가 옛 파일을 물고 있으면 설정 화면의 숫자가 안 올라가므로 바로 알 수 있습니다. */
-const BUILD = 'A-15';
+const BUILD = 'A-16';
 const SITE_ID = 'unseo-thetime';
 const LS_UNITS = 'ittv_units';
 const LS_CONTACTS = 'ittv_contacts';
@@ -3499,17 +3506,22 @@ function exportPendingCsv(){
 }
 /* 🔐 도어락 임시 비밀번호 내려받기.
    ─ 왜 필요한가: 작업완료로 표시하는 순간 비밀번호는 서버에서 지워집니다(개인정보 보호).
-     그런데 기사가 현장에서 번호를 잊으면 그 집에 들어갈 방법이 도어락 철거밖에 없습니다.
-     그 사고를 막으려고 '지워지기 전에' 미리 종이/파일로 남겨 두는 것입니다.
+     그 뒤에 '입주민 본인'이 자기가 만들어 둔 임시 비밀번호를 잊고 연락해 오시면,
+     사무소에도 기록이 남아 있지 않아 알려드릴 수가 없습니다.
+     그 세대는 도어락을 강제 철거하는 것 말고는 집에 들어갈 방법이 없어집니다.
+     그 사고를 막으려고 '지워지기 전에' 미리 파일로 남겨 두는 것입니다.
+   ⚠ 그래서 이 파일은 작업이 끝난 뒤에도 한동안 보관해야 합니다 —
+     쓰임새가 생기는 시점이 바로 '작업 완료 후'이기 때문입니다.
    ⚠ 이 파일은 남의 집 현관을 여는 번호 묶음입니다. 그래서 이렇게 좁혔습니다.
        · 관리자만 받을 수 있습니다 (직원·기사는 눌러도 안 나갑니다)
        · 이름·연락처는 넣지 않습니다 — 새어 나가도 '누구 집인지'까지는 알 수 없게
        · 파일 첫 줄에 경고를 박아, 열어본 사람이 성격을 바로 알게
        · 파일 이름에 시:분까지 넣어 이전 파일을 덮어쓰지 않게 */
 function pinUnits(){
+  /* 호실 순으로 냅니다. 「저 502호인데 비번을 잊었어요」 하고 전화가 오므로,
+     날짜순보다 호실순이 찾기 빠릅니다. */
   return units.filter(u => hasPin(u.presence) && String(u.pin||'').trim())
-              .sort((a,b)=> (a.date||'9999').localeCompare(b.date||'9999')
-                         || sortBySlotThenHo(a,b));
+              .sort((a,b)=> a.floor - b.floor || String(a.ho).localeCompare(String(b.ho)));
 }
 function renderPinCount(){
   const box = $('pinCnt'); if(!box) return;
@@ -3527,14 +3539,16 @@ function exportPinCsv(){
   const list = pinUnits();
   if(!list.length) return toast('저장된 임시 비밀번호가 없습니다', 3000);
   if(!confirm(`도어락 임시 비밀번호 ${list.length}세대를 파일로 내려받습니다.\n\n`
+    + `입주민이 임시 비밀번호를 잊고 연락해 오실 때 알려드리기 위한 보관본입니다.\n\n`
     + `이 파일에는 남의 집 현관을 여는 번호가 그대로 들어 있습니다.\n`
     + `  · 소장님 컴퓨터에만 보관하세요\n`
     + `  · 카톡·메일·USB 로 옮기지 마세요\n`
-    + `  · 작업이 끝나면 즉시 지우세요\n\n계속할까요?`)) return;
+    + `  · 문의가 잦아드는 2~3주 뒤에 파기하세요\n\n계속할까요?`)) return;
   const stamp = new Date().toLocaleString('ko-KR', { timeZone:'Asia/Seoul',
     year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false });
   const rows = [
-    [`⚠ 도어락 임시 비밀번호 — 대외비. 뽑은 시각 ${stamp}. 작업 종료 후 즉시 파기하세요.`],
+    [`⚠ 도어락 임시 비밀번호 — 대외비. 뽑은 시각 ${stamp}.`],
+    [`입주민이 임시 비밀번호를 잊고 문의하실 때 알려드리기 위한 보관본입니다. 문의가 잦아들면 파기하세요.`],
     ['호실','재실유형','방문일','시간대','임시 비밀번호','상태'],
   ];
   list.forEach(u => rows.push([
@@ -3547,7 +3561,7 @@ function exportPinCsv(){
   ]));
   const t = new Date(Date.now() + 9*3600000).toISOString().slice(0,16).replace('T','_').replace(':','');
   downloadCsv(`대외비_도어락비밀번호_${t}.csv`, rows);
-  toast(`🔐 ${list.length}세대 — 작업 후 반드시 파일을 지워 주세요`, 6000);
+  toast(`🔐 ${list.length}세대 — 입주민 문의에 대비해 보관하세요. 카톡·메일 금지`, 6000);
 }
 function copyPendingPhones(){
   const list = pendingUnits().filter(u=>phoneOf(u));
