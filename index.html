@@ -757,7 +757,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 const APP_VERSION = 'v1.0 (2026-07-27)';
 /* 판 번호 — 파일을 바꿀 때마다 올립니다.
    기기가 옛 파일을 물고 있으면 설정 화면의 숫자가 안 올라가므로 바로 알 수 있습니다. */
-const BUILD = 'A-16';
+const BUILD = 'A-17';
 const SITE_ID = 'unseo-thetime';
 const LS_UNITS = 'ittv_units';
 const LS_CONTACTS = 'ittv_contacts';
@@ -3341,9 +3341,19 @@ async function auditBookings(){
   auditResult = { dupes, mismatch, blocked, total: live.length };
   const rows = [];
   const tag = (c,t)=>`<span style="color:${c};font-weight:800">${t}</span>`;
+  /* 언제 점검한 것인지 남깁니다. 이게 없으면 단추를 눌렀는지조차 알 수 없습니다. */
+  const 시각 = new Date().toLocaleTimeString('ko-KR',
+    { timeZone:'Asia/Seoul', hour:'2-digit', minute:'2-digit', second:'2-digit' });
   rows.push(`<div style="padding:6px 0;font-size:15px">
     서버 예약 <b>${live.length}건</b> · 세대에 정확히 반영
-    <b>${live.length - dupes.length - mismatch.length - blocked.length}건</b></div>`);
+    <b>${live.length - dupes.length - mismatch.length - blocked.length}건</b>
+    <span class="bk-s" style="margin-left:6px">${시각} 점검</span></div>`);
+  /* 문제가 있을 때도 세 갈래를 모두 적어 둡니다.
+     「중복만 나왔다」와 「중복은 나왔고 나머지는 안 봤다」를 구별할 수 있어야 합니다. */
+  if(dupes.length || mismatch.length || blocked.length){
+    rows.push(`<div class="bk-s" style="padding:0 0 6px">중복 예약 ${dupes.length}건 ·
+      세대와 다른 예약 ${mismatch.length}건 · 확인이 필요한 예약 ${blocked.length}건</div>`);
+  }
   if(dupes.length) rows.push(`<div class="ul-item-warn"><div>
     ${tag('var(--red)','중복 예약 '+dupes.length+'건')} — ${esc(dupes.map(b=>b.ho+'호').join(', '))}<br>
     <span class="bk-s">한 세대가 두 시간대를 잡고 있습니다. 정리하면 오래된 쪽이 취소되고 그 자리가 다른 분께 열립니다.</span>
@@ -3359,8 +3369,14 @@ async function auditBookings(){
     <button class="btn btn-outline btn-sm" style="margin-top:6px"
       onclick="cancelBookingDoc('${escA(x.b.id)}')">이 예약 취소 처리</button></div></div>`));
   if(!dupes.length && !mismatch.length && !blocked.length){
+    /* 개시일 아침에는 아직 한 건도 없습니다. 그때 「0건이 모두 반영되었습니다」는
+       말이 되지 않으니, 예약함이 비어 있다고 그대로 알려드립니다. */
     rows.push(`<div class="ul-item-warn" style="border-color:var(--green)"><div>
-      ${tag('var(--green)','✅ 이상 없음')} — 예약 ${live.length}건이 모두 세대에 정확히 반영되어 있습니다.
+      ${tag('var(--green)','✅ 이상 없음')} — ${live.length
+        ? `예약 ${live.length}건이 모두 세대에 정확히 반영되어 있습니다.`
+        : '아직 들어온 입주민 예약이 없습니다.'}<br>
+      <span class="bk-s">중복 예약 0건 · 세대와 다른 예약 0건 · 확인이 필요한 예약 0건<br>
+      입주민이 넣은 예약 가운데 사무소 화면에 안 뜬 건은 없습니다.</span>
       </div></div>`);
   }else if(dupes.length || mismatch.length){
     rows.push(`<button class="btn btn-primary btn-full" style="margin-top:8px" onclick="fixAudit()">
@@ -4690,7 +4706,7 @@ function subscribeCloud(){
     setBookingHealth('ok', `예약 ${bookingIndex.size}건 수신 중`);
     if(n){ saveLocal(); renderAll(); toast(`📩 입주민 예약 ${n}건이 반영되었습니다`, 3200); }
     else renderBookingHealth();
-    auditBookings();          // 받은 김에 예약함과 세대 자료가 같은지 견줍니다
+    checkBookingSync();       // 받은 김에 예약함과 세대 자료가 같은지 견줍니다
   }, err=>{
     console.error('예약함 구독 실패', err);
     setBookingHealth('err', pushErrText(err));
@@ -4719,8 +4735,13 @@ function applyPendingBookings(reason){
    화면 어디에도 표시가 없습니다. 실제로 그런 일이 있었습니다.
 
    그래서 사건과 무관하게 '지금 이 순간 예약함과 세대 자료가 같은가'를 통째로 견줍니다.
-   입주민이 예약했는데 사무소 화면에 안 뜨는 일을 막는 마지막 방어선입니다. */
-function auditBookings(){
+   입주민이 예약했는데 사무소 화면에 안 뜨는 일을 막는 마지막 방어선입니다.
+
+   ⚠ 이름을 auditBookings 로 하면 안 됩니다.
+   통계 탭의 「🔎 예약함 점검」 단추가 부르는 함수와 이름이 겹쳐, 나중에 선언된 이쪽이
+   그 단추까지 가로챕니다. 그러면 단추를 눌러도 결과 칸에 아무것도 안 나옵니다.
+   이쪽은 화면에 그리지 않고 건수만 돌려주는, 30초마다 도는 조용한 점검입니다. */
+function checkBookingSync(){
   if(!bookingsLoaded || !units.length) return 0;
   let bad = 0;
   bookingIndex.forEach((b, ho)=>{
@@ -5403,7 +5424,7 @@ async function forceSync(){
       setBookingHealth('ok', `예약 ${bookingIndex.size}건 수신 중`);
       /* 「동기화」는 소장님이 미덥지 않을 때 누르시는 단추입니다.
          그때야말로 예약함과 세대 자료가 같은지 통째로 견줘 드려야 합니다. */
-      const gap = auditBookings();
+      const gap = checkBookingSync();
       if(gap) toast(`⚠️ 입주민 예약과 세대 일정이 다른 세대 ${gap}곳 — 대시보드에서 확인해 주세요`, 9000);
     }catch(e){
       fails.push('입주민 예약함');
@@ -5465,7 +5486,7 @@ setInterval(()=>{
   applyPendingBookings('주기 점검');
   /* 반영을 다시 시도한 뒤에도 여전히 어긋나 있으면 소장님께 알립니다.
      이 점검이 없으면 어긋난 상태가 화면 어디에도 안 나타난 채 그대로 굳습니다. */
-  auditBookings();
+  checkBookingSync();
 }, 30000);
 
 /* ═══════════════════════════════════════════
