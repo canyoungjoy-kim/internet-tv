@@ -260,7 +260,7 @@ footer{text-align:center;padding:20px 18px;color:var(--muted);font-size:13.5px;l
 <script>
 /* 판 번호 — 파일을 바꿀 때마다 올립니다.
    휴대폰이 옛 파일을 물고 있으면 여기 숫자가 안 올라가므로 바로 알 수 있습니다. */
-const BUILD = 'B-8';
+const BUILD = 'B-9';
 const SITE_ID = 'unseo-thetime';
 const FB_VER = '10.12.2';
 const DOW = ['일','월','화','수','목','금','토'];
@@ -824,11 +824,15 @@ async function doSubmit(){
       }
       /* 예약 활동 시각 — 사무소가 「무엇이 언제 바뀌었나」를 보기 위한 기록입니다.
          at 하나만 두면 바뀔 때마다 덮어써져, 처음 접수한 때를 알 수 없습니다.
-           firstAt  최초 접수 (한 번만 찍고 이후로 안 건드림)
+           firstAt  최초 접수 (지금 살아있는 예약을 처음 넣은 때)
            chgAt    마지막으로 날짜·시간을 바꾼 때
            cancelAt 취소한 때 (다시 예약하면 비웁니다) */
       const now = Date.now();
-      const moved2 = !cur || cur.cancelled || cur.date !== sel.date || cur.slot !== sel.slot;
+      /* 취소했다가 다시 잡는 것은 '자리를 옮긴 것'이 아니라 '새로 넣은 것'입니다.
+         옛 firstAt 을 그대로 두면 chgAt 이 그보다 뒤가 되어 사무소 대시보드에서
+         「변경」으로 잡히고, 오늘 새로 들어온 세대가 「신규」에서 빠집니다. */
+      const 다시접수 = !cur || !!cur.cancelled;
+      const moved2 = 다시접수 || cur.date !== sel.date || cur.slot !== sel.slot;
       tx.set(bkRef, {
         ho: sel.ho,
         phone4: sel.ph4,
@@ -839,8 +843,8 @@ async function doSubmit(){
         note: $('inNote').value.trim(),
         cancelled: false,
         at: now,
-        firstAt: (cur && cur.firstAt) ? cur.firstAt : now,
-        chgAt: moved2 ? now : ((cur && cur.chgAt) || 0),
+        firstAt: 다시접수 ? now : (cur.firstAt || now),
+        chgAt:   다시접수 ? 0   : (moved2 ? now : (cur.chgAt || 0)),
         cancelAt: 0,
       });
     });

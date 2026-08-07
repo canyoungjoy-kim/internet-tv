@@ -757,7 +757,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 const APP_VERSION = 'v1.0 (2026-07-27)';
 /* 판 번호 — 파일을 바꿀 때마다 올립니다.
    기기가 옛 파일을 물고 있으면 설정 화면의 숫자가 안 올라가므로 바로 알 수 있습니다. */
-const BUILD = 'A-17';
+const BUILD = 'A-18';
 const SITE_ID = 'unseo-thetime';
 const LS_UNITS = 'ittv_units';
 const LS_CONTACTS = 'ittv_contacts';
@@ -4992,6 +4992,10 @@ async function pushBookingUpdate(u, before){
   const nowB = Date.now();
   const cancelling = !(u.date && u.slot);
   const movedB = (cur.date || '') !== (u.date || '') || (cur.slot || '') !== (u.slot || '');
+  /* 취소됐던(또는 예약이 없던) 세대에 사무소가 자리를 잡아 주는 것도 '새 접수'입니다.
+     옛 firstAt 을 남겨 두면 대시보드에서 「변경」으로 잡혀,
+     오늘 새로 자리를 얻은 세대가 「신규」에서 빠집니다. */
+  const 다시접수 = !cancelling && (!cur.firstAt || !!cur.cancelled);
   const full = {
     ho, phone4: p4,
     date: u.date || '', slot: u.slot || '',
@@ -5000,8 +5004,8 @@ async function pushBookingUpdate(u, before){
     cancelled: cancelling,
     byOffice: true,
     at: nowB,
-    firstAt: cur.firstAt || (cancelling ? 0 : nowB),
-    chgAt: movedB && !cancelling ? nowB : (cur.chgAt || 0),
+    firstAt: 다시접수 ? nowB : (cur.firstAt || (cancelling ? 0 : nowB)),
+    chgAt:   다시접수 ? 0 : (movedB && !cancelling ? nowB : (cur.chgAt || 0)),
     cancelAt: cancelling ? (movedB ? nowB : (cur.cancelAt || nowB)) : 0,
   };
   try{
