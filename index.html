@@ -757,7 +757,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 const APP_VERSION = 'v1.0 (2026-07-27)';
 /* 판 번호 — 파일을 바꿀 때마다 올립니다.
    기기가 옛 파일을 물고 있으면 설정 화면의 숫자가 안 올라가므로 바로 알 수 있습니다. */
-const BUILD = 'A-19';
+const BUILD = 'A-20';
 const SITE_ID = 'unseo-thetime';
 const LS_UNITS = 'ittv_units';
 const LS_CONTACTS = 'ittv_contacts';
@@ -4970,6 +4970,16 @@ function applyBookingInner(b, docId){
   if(b.cancelled){
     if(u.status==='booked'){ u.status='todo'; touched = true; }
     if(appendNote(u, '[입주민] 예약 취소')) touched = true;
+    /* 부재(비번)로 예약하셨다가 그 예약을 취소하면, 남겨두신 임시 비밀번호도 함께 지웁니다.
+       안 지우면 아무도 찾아가지 않는 세대의 현관 번호가 서버에 그대로 남습니다.
+       🔐 도어락 비밀번호 CSV(pinUnits)는 '예약이 있는지'를 보지 않고 비번만 보므로,
+       예약을 접은 세대까지 그 대외비 파일에 실리게 됩니다.
+       (사무소가 직접 넣은 공실·호텔 비번은 건드리지 않습니다 —
+        아래 '재실로 바꾸면 지운다'와 똑같이 absentPin 인 경우만 지웁니다) */
+    if(u.presence === 'absentPin'){
+      set('pin', '');
+      set('presence', 'present');
+    }
   }else{
     // 예약 접수함에 옛 값('day'/'pin')이 남아 있어도 새 체계로 받습니다
     const oldPres = u.presence;
