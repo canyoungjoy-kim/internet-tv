@@ -757,7 +757,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 const APP_VERSION = 'v1.0 (2026-07-27)';
 /* 판 번호 — 파일을 바꿀 때마다 올립니다.
    기기가 옛 파일을 물고 있으면 설정 화면의 숫자가 안 올라가므로 바로 알 수 있습니다. */
-const BUILD = 'A-20';
+const BUILD = 'A-21';
 const SITE_ID = 'unseo-thetime';
 const LS_UNITS = 'ittv_units';
 const LS_CONTACTS = 'ittv_contacts';
@@ -5573,7 +5573,20 @@ $('buildTag').textContent = BUILD;
 loadLocal();
 renderAll();
 initFirebase();
-$('unitModal').addEventListener('click', e=>{ if(e.target.id==='unitModal') closeUnitModal(); });
+/* 어두운 배경을 눌러 세대 창을 닫는 기능.
+   ⚠ 「누르기 시작한 곳」까지 함께 봐야 합니다.
+     메모 글자를 마우스로 끌어 고르다가 창 바깥에서 손을 떼면, 브라우저는 그 click 을
+     '메모칸과 배경의 공통 조상' 곧 이 배경(#unitModal) 위에서 일어난 것으로 봅니다.
+     그래서 예전에는 글자를 고르는 도중에 창이 닫혀 버렸습니다 —
+     소장님 눈에는 「Delete 를 누르는 순간 호실 창이 사라지고 메모는 그대로」로 보입니다.
+     (창이 이미 닫혀 있으니 Delete 가 메모칸에 닿지 않습니다)
+   눌러 시작한 곳도 배경일 때만 닫습니다. 창 안에서 시작한 손짓은 창을 닫지 않습니다. */
+let 배경에서시작 = false;
+$('unitModal').addEventListener('pointerdown', e=>{ 배경에서시작 = (e.target.id==='unitModal'); });
+$('unitModal').addEventListener('click', e=>{
+  if(e.target.id==='unitModal' && 배경에서시작) closeUnitModal();
+  배경에서시작 = false;
+});
 
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('./sw.js').catch(()=>{});
