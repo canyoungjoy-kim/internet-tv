@@ -216,6 +216,15 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 .ws-memo-tag.off{background:#2563eb}
 .ws-sheet tbody.ws-row tr:first-child td{border-bottom:none}
 .ws-sheet tbody.ws-row{border-bottom:1px solid var(--border)}
+/* 시간대 구분 띠 — 시간 묶음이 바뀌는 자리를 종이에서 한눈에 갈라 보이게 합니다.
+   색·굵은 테두리·진한 글자를 함께 써서, 배경색을 끄고 인쇄해도 구분됩니다. */
+.ws-sheet tbody.ws-band td{
+  background:#e8edf7;border-top:3px solid #1a2a4a;border-bottom:2px solid #1a2a4a;
+  padding:6px 12px}
+.ws-band-t{font-weight:900;font-size:1.06em;color:#1a2a4a;letter-spacing:.02em}
+.ws-band-t::before{content:'■ ';color:#2c3e6b}
+.ws-band-n{margin-left:10px;font-weight:800;font-size:.86em;color:#2c3e6b}
+.ws-band-n::before{content:'· '}
 /* 성명·연락처를 넣으면 자리가 빠듯해지므로 본문 글씨를 약간 줄입니다 */
 .ws-sheet.pers table.tbl{font-size:15.6px}
 .ws-sheet.pers table.tbl th{font-size:13.6px}
@@ -323,6 +332,9 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
   .ws-sheet tbody.ws-row{page-break-inside:avoid}
   .ws-sheet tr.ws-memo td{background:#fffbeb!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .ws-memo-tag{background:#f59e0b!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  /* 시간대 구분 띠 — 색을 살리고, 띠만 페이지 끝에 홀로 남지 않게 합니다 */
+  .ws-sheet tbody.ws-band td{background:#e8edf7!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .ws-sheet tbody.ws-band{page-break-inside:avoid;page-break-after:avoid;break-after:avoid}
   table.tbl thead{display:table-header-group}
   .ws-floor{page-break-before:always}
   .ws-floor:first-of-type{page-break-before:auto}
@@ -757,7 +769,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 const APP_VERSION = 'v1.0 (2026-07-27)';
 /* 판 번호 — 파일을 바꿀 때마다 올립니다.
    기기가 옛 파일을 물고 있으면 설정 화면의 숫자가 안 올라가므로 바로 알 수 있습니다. */
-const BUILD = 'A-21';
+const BUILD = 'A-22';
 const SITE_ID = 'unseo-thetime';
 const LS_UNITS = 'ittv_units';
 const LS_CONTACTS = 'ittv_contacts';
@@ -2734,7 +2746,22 @@ function renderWorksheet(){
   // 열 개수 — 메모 줄을 가로로 붙일 때 씁니다
   const nCols = 7 + (showPersonal ? 2 : 0);
 
+  /* 시간대가 바뀔 때마다 구분 띠를 끼워 넣습니다.
+     선 한 줄만으로는 줄이 촘촘한 종이에서 잘 안 보입니다 —
+     기사가 「지금 몇 시 묶음을 하고 있는지」를 한눈에 알아야 합니다.
+     ⚠ 배경색을 끄고 인쇄하는 프린터가 있으므로, 색이 사라져도 알아볼 수 있게
+       굵은 테두리와 진한 글자를 함께 씁니다. */
+  let 앞칸 = null;
   const rows = list.map(u=>{
+    let 띠 = '';
+    if((u.slot||'') !== 앞칸){
+      앞칸 = u.slot||'';
+      const 몇세대 = list.filter(x=>(x.slot||'') === 앞칸).length;
+      띠 = `<tbody class="ws-band"><tr><td colspan="${nCols}">
+        <span class="ws-band-t">${esc(slotLabel(date,u.slot)||'시간 미정')}</span>
+        <span class="ws-band-n">${몇세대}세대</span>
+      </td></tr></tbody>`;
+    }
     const pinCell = isHotel(u.presence)
       ? '<strong style="white-space:nowrap">🏨 11시 이후 개방시</strong>'
       : hasPin(u.presence)
@@ -2755,7 +2782,7 @@ function renderWorksheet(){
         <span class="ws-memo-tag off">관리실</span>${offs.map(t=>esc(t)).join(' / ')}
       </td></tr>` : '');
     // 세대와 그 요청이 인쇄 중 갈라지지 않도록 한 덩어리로 묶습니다
-    return `<tbody class="ws-row">
+    return 띠 + `<tbody class="ws-row">
       <tr>
         <td class="nw" style="font-weight:800;font-size:1.15em">${esc(u.ho)}</td>
         <td class="nw">${esc(slotLabel(date,u.slot)||'미정')}</td>
