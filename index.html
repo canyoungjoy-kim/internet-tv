@@ -769,7 +769,7 @@ table.tbl td.num{text-align:center;font-weight:700;font-variant-numeric:tabular-
 const APP_VERSION = 'v1.0 (2026-07-27)';
 /* 판 번호 — 파일을 바꿀 때마다 올립니다.
    기기가 옛 파일을 물고 있으면 설정 화면의 숫자가 안 올라가므로 바로 알 수 있습니다. */
-const BUILD = 'A-22';
+const BUILD = 'A-23';
 const SITE_ID = 'unseo-thetime';
 const LS_UNITS = 'ittv_units';
 const LS_CONTACTS = 'ittv_contacts';
@@ -1313,6 +1313,10 @@ const ISSUE_TEXT = {
               '작업일을 바꾸기 전에 접수된 예약입니다. 입주민께 연락해 일정을 다시 잡아주세요.'],
   skew:   b=>[`기기 시각이 어긋난 예약입니다${b.date?` (${esc(fmtDate(b.date))})`:''}`,
               '내용대로 반영했습니다. 혹시 모르니 입주민께 시간을 한 번 확인해 주세요.'],
+  onhold: b=>[`「보류·거부」로 정해 둔 세대에 예약이 들어왔습니다`
+              + `${b.date?` (${esc(fmtDate(b.date))} ${esc(slotLabel(b.date,b.slot)||b.slot||'')})`:''}`,
+              '마음을 바꾸셨을 수 있습니다. 「보류·거부」는 건드리지 않고 그대로 두었습니다 —'
+              + ' 받아들이시려면 세대 창에서 상태를 「예약확정」으로 바꿔 주세요.'],
   /* 예약함과 세대 자료가 서로 다른 상태 — 어느 쪽이 맞는지는 사람이 정해야 합니다 */
   mismatch: b=>[`입주민 예약과 세대 일정이 다릅니다`,
               `입주민 예약: ${b.date?esc(fmtDate(b.date))+' '+esc(slotLabel(b.date,b.slot)||b.slot||''):'취소'}`
@@ -4954,6 +4958,25 @@ function applyBookingInner(b, docId){
   if(docId) u.bookingId = docId;      // 사무소가 일정을 바꿀 때 되돌려 쓸 주소
   if(u.bkSig === sig) return false;   // 예약함이 그대로 → 할 일 없음
 
+  /* ⚠ 처음 여는 기기에서 「이미 반영된 예약」을 새 예약으로 착각하지 않게 합니다.
+     ─ 예약 지문(bkSig)은 서버 규칙이 허용하지 않는 항목이라 저장하지 못하고,
+       기기 안에만 남습니다(pushUnit 의 delete clean.bkSig).
+       그래서 관리자·직원 화면을 처음 여는 기기는 지문이 비어 있어,
+       살아있는 예약을 전부 「새로 들어온 예약」으로 보고 다시 반영했습니다.
+     그 결과 두 가지가 조용히 벌어졌습니다.
+       ① 사무소가 손으로 정해 둔 「보류·거부」가 「예약확정」으로 되돌아갔습니다.
+          (아래 set('status','booked') — 「완료」만 지켜지고 있었습니다)
+       ② 입주민이 예약할 때 적은 메모가 열 때마다 한 줄씩 덧붙었습니다.
+     세대에 이미 그 예약대로 적혀 있으면, 지문만 남기고 조용히 넘어갑니다. */
+  if(!u.bkSig){
+    const 이미반영됨 = b.cancelled
+      ? (!u.date && !u.slot)
+      : (u.date === (b.date||'') && u.slot === (b.slot||'')
+         && (PRESENCE_MIGRATE[b.presence] || b.presence || u.presence) === u.presence
+         && (!b.pin || u.pin === b.pin));
+    if(이미반영됨){ u.bkSig = sig; saveLocal(); return false; }
+  }
+
   /* 이미 작업이 끝난 세대에 예약이 들어오면 일정은 건드리지 않되,
      조용히 버리지 않고 소장님께 알립니다 (재작업 요청일 수 있습니다) */
   if(u.status==='done'){
@@ -5020,7 +5043,15 @@ function applyBookingInner(b, docId){
     if(b.name && !nameOf(u)){ setContact(u.ho, b.name, undefined); pushContact(u.ho); }
     if(b.note && appendNote(u, '[입주민] ' + b.note)) touched = true;
     set('bookedBy', 'self');
-    if(u.date && u.slot) set('status', 'booked');
+    /* 사무소가 손으로 「보류·거부」·「공실」로 정해 둔 세대는,
+       예약이 하나 들어왔다고 조용히 「예약확정」으로 되돌리지 않습니다.
+       ─ 그 판단은 소장님이 세대와 이야기해서 내리신 것입니다.
+         조용히 뒤집히면 거부하신 세대에 기사가 찾아가게 됩니다.
+       일정·재실·비밀번호는 예약대로 받아 적되, 상태는 그대로 두고 알려드립니다. */
+    if(u.date && u.slot){
+      if(u.status === 'hold' || u.status === 'vacant') flagBooking('onhold', b, sig);
+      else set('status', 'booked');
+    }
   }
   u.bkSig = sig;
   u.bookedAtMs = Math.max(u.bookedAtMs||0, b.at||0);
