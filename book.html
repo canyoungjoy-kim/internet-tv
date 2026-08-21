@@ -72,8 +72,21 @@ textarea{resize:vertical;min-height:74px;font-size:16px}
 .slot-btn .left{text-align:left}
 .slot-btn .rest{font-size:14px;font-weight:700;color:var(--green)}
 .slot-btn.on{border-color:var(--primary);background:var(--primary-light)}
-.slot-btn.full{opacity:.5;pointer-events:none;background:#f8fafc}
+/* 마감된 시간 —
+   예전에는 pointer-events:none 으로 아예 눌리지 않게 막아 두었습니다.
+   그런데 입주민께는 그것이 「메뉴가 안 눌러진다 = 사이트가 고장났다」로 보입니다.
+   특히 일요일처럼 그 날 시간대가 전부 차 있으면 화면이 멈춘 것처럼 느껴져,
+   원인을 알 수 없으니 예약을 포기하고 관리사무소로 전화를 주십니다.
+   그래서 이제는 눌리게 두고, 누르면 「왜 안 되는지」를 말씀드립니다. */
+.slot-btn.full{opacity:.62;background:#f8fafc;border-style:dashed;cursor:default}
 .slot-btn.full .rest{color:var(--red)}
+/* 그 날 시간대가 전부 찬 날짜 — 날짜 목록에서 미리 알려드립니다 */
+.day-btn.dfull{opacity:.66;background:#f8fafc;border-style:dashed}
+.day-btn.dfull .dw{color:var(--muted)}
+.day-btn .dx{font-size:11.5px;font-weight:800;color:var(--red);margin-top:2px;line-height:1.1}
+/* 마감 안내 쪽지 */
+.slot-msg{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:11px;
+  padding:12px 13px;font-size:15px;font-weight:700;line-height:1.55;margin-bottom:11px;white-space:pre-line}
 
 .hide{display:none!important}
 .center{text-align:center}
@@ -210,6 +223,7 @@ footer{text-align:center;padding:20px 18px;color:var(--muted);font-size:13.5px;l
     <div class="step hide" id="stepSlot">
       <div class="step-head"><span class="n">4</span>시간 선택</div>
       <div class="step-body">
+        <div class="slot-msg hide" id="slotMsg"></div>
         <div class="slots" id="slotPick"></div>
       </div>
     </div>
@@ -260,7 +274,7 @@ footer{text-align:center;padding:20px 18px;color:var(--muted);font-size:13.5px;l
 <script>
 /* 판 번호 — 파일을 바꿀 때마다 올립니다.
    휴대폰이 옛 파일을 물고 있으면 여기 숫자가 안 올라가므로 바로 알 수 있습니다. */
-const BUILD = 'B-9';
+const BUILD = 'B-10';
 const SITE_ID = 'unseo-thetime';
 const FB_VER = '10.12.2';
 const DOW = ['일','월','화','수','목','금','토'];
@@ -339,6 +353,50 @@ async function loadAvailFor(dateStr, force){
   availLoaded.add(dateStr);
 }
 
+/* 모든 작업일의 잔여석을 한 번에 읽습니다 —
+   날짜 목록에 「마감」을 미리 표시해 드리려면 그 날들의 자리 수를 알아야 합니다.
+   ⚠ 날짜마다 따로 물으면 조회가 날짜 수만큼 늘어납니다.
+     where('date','in',[...]) 로 한 번에 묶어 물어 조회 1회로 끝냅니다.
+     (Firestore 의 in 은 한 번에 30개까지라 30일씩 잘라서 묻습니다) */
+let lastAvailAll = 0;
+async function loadAvailAll(force){
+  const days = ((pub && pub.days)||[]).map(d=>d.date).filter(Boolean);
+  if(!days.length) return;
+  /* ⚠ 조회 수 제한.
+     이 한 번에 작업일의 시간대 문서를 통째로 읽습니다(지금 69개).
+     화면을 자주 들락거리시는 분이 계셔서, 막지 않으면 한 분이 하루 한도의
+     상당 부분을 혼자 쓰실 수 있습니다. 90초 안에는 다시 읽지 않습니다.
+     ─ 고르신 날짜의 자리 수는 이것과 별개로 항상 새로 읽으므로(loadAvailFor),
+       정확도가 필요한 곳은 손해를 보지 않습니다. */
+  if(!force && Date.now() - lastAvailAll < 90000) return;
+  lastAvailAll = Date.now();
+  const { collection, getDocs, query, where } = fbm;
+  for(let i=0;i<days.length;i+=30){
+    const 묶음 = days.slice(i, i+30);
+    const snap = await getDocs(query(collection(db,'sites',SITE_ID,'slots'),
+                                     where('date','in',묶음)));
+    snap.forEach(d=>{ avail[d.id] = (d.data().n)||0; });
+    묶음.forEach(d=>availLoaded.add(d));
+  }
+}
+
+/* 그 날짜가 통째로 마감인가 —
+   자리 수를 아직 못 읽었으면 함부로 '마감'이라고 하지 않습니다.
+   모르면서 마감이라 적으면, 실제로는 자리가 있는 날을 입주민이 그냥 지나치십니다. */
+function dayFull(d){
+  const list = slotsFor(d);
+  if(!list.length) return false;
+  if(!availLoaded.has(d)) return false;          // 모르면 아무 말도 하지 않습니다
+  return list.every(s=>{
+    // 지금 내가 예약해 둔 자리는 나에게는 열려 있는 자리입니다
+    const mine = myBooking && !myBooking.cancelled &&
+                 myBooking.date===d && myBooking.slot===s.id;
+    if(mine) return false;
+    const cap = Number(s.cap)||0;
+    return cap <= 0 || (avail[slotKey(d, s.id)]||0) >= cap;
+  });
+}
+
 /* 안내 정보 다시 읽기 —
    예약 화면을 며칠 열어둔 채로 제출하시는 분이 계십니다. 그 사이 사무소가
    작업일을 바꾸거나 접수를 닫았으면, 없어진 날짜로 예약이 들어가 일정표에서
@@ -365,11 +423,31 @@ async function syncPub(){
   const sig = p => JSON.stringify({ d:(p&&p.days)||[], s:(p&&p.slots)||{}, o:!!(p&&p.bookingOpen) });
   const before = sig(pub);
   await refreshPub();
-  if(sig(pub) === before) return;             // 바뀐 게 없으면 화면을 건드리지 않습니다
+  const 시간표바뀜 = sig(pub) !== before;
 
-  availLoaded.clear();                        // 잔여석도 옛 값이므로 다시 읽습니다
+  /* ⚠ 예전에는 시간표가 바뀌었을 때만 잔여석을 다시 읽었습니다.
+       그래서 시간표는 그대로인데 자리만 달라진 경우 —
+       ① 그 사이 자리가 다 차면, 열어둔 화면에는 「예약 가능」이 남아 있다가
+          제출할 때서야 마감이라는 말을 듣습니다.
+       ② 누가 취소해 자리가 났는데도 「마감」인 채로 남아, 눌러도 반응이 없습니다.
+     시간표가 그대로여도 자리 수는 항상 다시 읽습니다.
+     (조회는 묶어서 1회입니다 — 8초에 한 번 제한도 그대로 걸려 있습니다) */
+  try{
+    /* 시간표가 바뀌었으면 조회 제한을 무시하고 전부 다시 읽습니다.
+       ⚠ availLoaded 를 통째로 비우지는 않습니다 — 비워 놓고 조회 제한에 걸리면
+         「자리 수를 모르는 상태」가 되어 날짜 목록의 마감 표시가 사라집니다. */
+    await loadAvailAll(시간표바뀜);
+    // 고르신 날짜만은 제한 없이 항상 새로 읽습니다
+    if(sel.date) await loadAvailFor(sel.date, true);
+  }catch(e){ console.error('잔여석 갱신 실패', e); }
+
   if(!$('stepDay').classList.contains('hide')) renderDays();
-  if(!sel.date) return;
+  if(!sel.date){ if(!$('stepSlot').classList.contains('hide')) renderSlots(); return; }
+  if(!시간표바뀜){
+    /* 시간표는 그대로이니 고른 날짜·시간은 건드리지 않고, 자리 수만 새로 그립니다 */
+    if(!$('stepSlot').classList.contains('hide')) renderSlots();
+    return;
+  }
 
   if(!(pub.days||[]).some(x=>x.date===sel.date)){
     // 고르셨던 날짜가 없어졌습니다
@@ -379,7 +457,7 @@ async function syncPub(){
     $('stepSubmit').classList.add('hide');
     return;
   }
-  try{ await loadAvailFor(sel.date, true); }catch(e){ console.error(e); }
+  // 잔여석은 바로 위에서 이미 다시 읽었습니다
   if(sel.slot && !slotsFor(sel.date).some(x=>x.id===sel.slot)){
     sel.slot='';
     $('stepSubmit').classList.add('hide');
@@ -647,6 +725,12 @@ function pickMode(btn){
   syncPub();
   $('stepDay').classList.remove('hide');
   setTimeout(()=>$('stepDay').scrollIntoView({behavior:'smooth', block:'start'}), 80);
+  /* 날짜 목록에 「마감」을 적어 드리려면 모든 날의 자리 수가 필요합니다.
+     화면은 이미 떠 있으므로, 다 읽히는 대로 조용히 다시 그립니다.
+     ⚠ 읽기가 실패해도 예약을 막으면 안 됩니다 — 표시만 생략합니다. */
+  loadAvailAll().then(()=>{
+    if(!$('stepDay').classList.contains('hide')) renderDays();
+  }).catch(e=>console.error('잔여석 미리 읽기 실패', e));
 }
 
 /* ── 3. 날짜 ── */
@@ -658,15 +742,22 @@ function renderDays(){
     $('dayPick').innerHTML = '<div class="muted">예약 가능한 날짜가 남아 있지 않습니다. 관리사무소(032-710-5679)로 문의해 주세요.</div>';
     return;
   }
-  $('dayPick').innerHTML = days.map(d=>`
-    <button class="day-btn ${isWeekend(d)?'we':''} ${sel.date===d?'on':''}" onclick="pickDay('${d}')">
+  /* 자리가 다 찬 날은 미리 알려드립니다.
+     막지는 않습니다 — 눌러서 '왜 안 되는지'를 확인하실 수 있어야 합니다. */
+  $('dayPick').innerHTML = days.map(d=>{
+    const 참 = dayFull(d);
+    return `
+    <button class="day-btn ${isWeekend(d)?'we':''} ${sel.date===d?'on':''} ${참?'dfull':''}" onclick="pickDay('${d}')">
       <div class="dd">${Number(d.split('-')[2])}일</div>
       <div class="dw">${dowOf(d)}요일</div>
-    </button>`).join('') || '<div class="muted">등록된 작업일이 없습니다</div>';
+      ${참?'<div class="dx">마감</div>':''}
+    </button>`;
+  }).join('') || '<div class="muted">등록된 작업일이 없습니다</div>';
 }
 async function pickDay(d){
   sel.date = d; sel.slot = '';
   renderDays();
+  slotMsg('');
   $('slotPick').innerHTML = '<div class="muted">잔여석 확인 중…</div>';
   $('stepSlot').classList.remove('hide');
   $('stepSubmit').classList.add('hide');
@@ -677,9 +768,30 @@ async function pickDay(d){
 }
 
 /* ── 4. 시간 ── */
+/* 마감 안내 쪽지를 띄우거나 감춥니다 */
+function slotMsg(m){
+  const el = $('slotMsg'); if(!el) return;
+  el.textContent = m || '';
+  el.classList.toggle('hide', !m);
+}
 function renderSlots(){
   const list = slotsFor(sel.date);
-  if(!list.length){ $('slotPick').innerHTML = '<div class="muted">선택 가능한 시간이 없습니다</div>'; return; }
+  if(!list.length){
+    slotMsg('');
+    $('slotPick').innerHTML = '<div class="muted">선택 가능한 시간이 없습니다</div>'; return;
+  }
+  /* 그 날이 통째로 마감이면 시간 단추만 흐리게 두지 않고 이유를 적어 드립니다.
+     이 안내가 없으면 「눌러도 아무 반응이 없는 화면」이 되어 고장으로 오해하십니다. */
+  if(dayFull(sel.date)){
+    const 남은 = ((pub.days||[]).map(x=>x.date)
+      .filter(x=>x && !isLocked(x) && !dayFull(x))).sort();
+    slotMsg(`${fmtDate(sel.date)}은 예약이 모두 찼습니다.\n`
+      + (남은.length
+          ? `아직 자리가 남은 날짜: ${남은.map(x=>Number(x.split('-')[2])+'일').join(', ')}\n다른 날짜를 선택해 주세요.`
+          : '관리사무소(032-710-5679)로 연락해 주세요.'));
+  }else{
+    slotMsg('');
+  }
   $('slotPick').innerHTML = list.map(s=>{
     const used = avail[slotKey(sel.date, s.id)]||0;
     const cap = Number(s.cap)||0;
@@ -690,13 +802,30 @@ function renderSlots(){
        예약 페이지만 무제한으로 열어두면 소장님이 막아둔 시간대에
        입주민이 몰려듭니다. */
     const full = !mine && (cap <= 0 || used >= cap);
-    return `<button class="slot-btn ${full?'full':''} ${sel.slot===s.id?'on':''}" ${full?'disabled':''} onclick="pickSlot('${s.id}')">
+    /* ⚠ disabled 를 붙이면 눌러도 onclick 이 아예 불리지 않아,
+         「왜 안 되는지」를 말씀드릴 기회가 사라집니다. 붙이지 않습니다. */
+    return `<button class="slot-btn ${full?'full':''} ${sel.slot===s.id?'on':''}" onclick="pickSlot('${s.id}')">
       <span class="left">${fmtTime(s.from)} ~ ${fmtTime(s.to)}</span>
       <span class="rest">${mine?'현재 예약':(full?'마감':'예약 가능')}</span>
     </button>`;
   }).join('');
 }
 function pickSlot(id){
+  /* 마감된 시간을 누르셨을 때 —
+     예전에는 아무 반응이 없어 사이트가 멈춘 것처럼 보였습니다. */
+  const s0 = slotsFor(sel.date).find(x=>x.id===id);
+  const mine0 = myBooking && !myBooking.cancelled &&
+                myBooking.date===sel.date && myBooking.slot===id;
+  if(s0 && !mine0){
+    const cap0 = Number(s0.cap)||0;
+    if(cap0 <= 0 || (avail[slotKey(sel.date, id)]||0) >= cap0){
+      slotMsg(`${fmtTime(s0.from)} ~ ${fmtTime(s0.to)} 는 예약이 모두 찼습니다.\n`
+        + '다른 시간이나 다른 날짜를 선택해 주세요.');
+      $('slotMsg').scrollIntoView({behavior:'smooth', block:'center'});
+      return;
+    }
+  }
+  slotMsg('');
   sel.slot = id;
   renderSlots();
   const s = slotsFor(sel.date).find(x=>x.id===id);
