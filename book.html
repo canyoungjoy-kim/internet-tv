@@ -274,7 +274,7 @@ footer{text-align:center;padding:20px 18px;color:var(--muted);font-size:13.5px;l
 <script>
 /* 판 번호 — 파일을 바꿀 때마다 올립니다.
    휴대폰이 옛 파일을 물고 있으면 여기 숫자가 안 올라가므로 바로 알 수 있습니다. */
-const BUILD = 'B-10';
+const BUILD = 'B-11';
 const SITE_ID = 'unseo-thetime';
 const FB_VER = '10.12.2';
 const DOW = ['일','월','화','수','목','금','토'];
@@ -346,38 +346,63 @@ const availLoaded = new Set();
 async function loadAvailFor(dateStr, force){
   if(!dateStr) return;
   if(!force && availLoaded.has(dateStr)) return;
-  const { collection, getDocs, query, where } = fbm;
-  const snap = await getDocs(query(collection(db,'sites',SITE_ID,'slots'),
-                                   where('date','==',dateStr)));
-  snap.forEach(d=>{ avail[d.id] = (d.data().n)||0; });
+  /* ⚠ 예전에는 where('date','==',…) 로 그 날짜의 문서를 전부 가져왔습니다.
+       시간표를 바꾸면 옛 시간칸 문서가 서버에 남는데, 그것까지 딸려 왔습니다.
+       (8월 28일은 4칸짜리 날인데 11개를 읽고 있었습니다)
+     지금 시간표에 있는 칸의 문서 이름만 집어서 읽습니다. */
+  const list = slotsFor(dateStr);
+  if(!list.length){ availLoaded.add(dateStr); return; }
+  const ids = list.map(s=>slotKey(dateStr, s.id));
+  const { collection, getDocs, query, where, documentId } = fbm;
+  for(let i=0;i<ids.length;i+=30){
+    const snap = await getDocs(query(collection(db,'sites',SITE_ID,'slots'),
+                                     where(documentId(),'in', ids.slice(i, i+30))));
+    snap.forEach(d=>{ avail[d.id] = (d.data().n)||0; });
+  }
+  // 아직 아무도 예약하지 않은 칸은 문서가 없습니다 — 0 으로 둡니다
+  ids.forEach(k=>{ if(avail[k] === undefined) avail[k] = 0; });
   availLoaded.add(dateStr);
 }
 
-/* 모든 작업일의 잔여석을 한 번에 읽습니다 —
+/* 고를 수 있는 날들의 잔여석을 한 번에 읽습니다 —
    날짜 목록에 「마감」을 미리 표시해 드리려면 그 날들의 자리 수를 알아야 합니다.
-   ⚠ 날짜마다 따로 물으면 조회가 날짜 수만큼 늘어납니다.
-     where('date','in',[...]) 로 한 번에 묶어 물어 조회 1회로 끝냅니다.
-     (Firestore 의 in 은 한 번에 30개까지라 30일씩 잘라서 묻습니다) */
+
+   ⚠ 「무엇을 읽지 않을지」가 이 함수의 핵심입니다. 조회 한 건도 돈입니다.
+     ① 지난 날짜·아침 7시가 지난 당일은 화면에 뜨지도 않습니다 → 읽지 않습니다.
+     ② 시간표를 바꾸면 옛 시간칸 문서가 서버에 그대로 남습니다(찌꺼기).
+        날짜로 물으면 그 찌꺼기까지 딸려 옵니다 → 문서 이름을 콕 집어 읽습니다.
+     예전에 날짜로 뭉뚱그려 물었을 때 69개를 읽었는데, 그중 43개가 헛읽기였습니다.
+     지금은 화면이 실제로 쓰는 것만 읽습니다.
+   (Firestore 의 in 은 한 번에 30개까지라 30개씩 잘라서 묻습니다) */
 let lastAvailAll = 0;
 async function loadAvailAll(force){
-  const days = ((pub && pub.days)||[]).map(d=>d.date).filter(Boolean);
+  if(!pub || !db || !fbm) return;
+  // 화면에 뜨는 날짜만 — renderDays 와 같은 기준입니다
+  const days = ((pub.days)||[]).map(d=>d.date).filter(d=>d && !isLocked(d));
   if(!days.length) return;
   /* ⚠ 조회 수 제한.
-     이 한 번에 작업일의 시간대 문서를 통째로 읽습니다(지금 69개).
      화면을 자주 들락거리시는 분이 계셔서, 막지 않으면 한 분이 하루 한도의
      상당 부분을 혼자 쓰실 수 있습니다. 90초 안에는 다시 읽지 않습니다.
      ─ 고르신 날짜의 자리 수는 이것과 별개로 항상 새로 읽으므로(loadAvailFor),
        정확도가 필요한 곳은 손해를 보지 않습니다. */
   if(!force && Date.now() - lastAvailAll < 90000) return;
   lastAvailAll = Date.now();
-  const { collection, getDocs, query, where } = fbm;
-  for(let i=0;i<days.length;i+=30){
-    const 묶음 = days.slice(i, i+30);
+
+  // 지금 시간표에 실제로 있는 칸의 문서 이름만 모읍니다
+  const ids = [];
+  days.forEach(d=>{ slotsFor(d).forEach(s=>ids.push(slotKey(d, s.id))); });
+  if(!ids.length) return;
+
+  const { collection, getDocs, query, where, documentId } = fbm;
+  for(let i=0;i<ids.length;i+=30){
     const snap = await getDocs(query(collection(db,'sites',SITE_ID,'slots'),
-                                     where('date','in',묶음)));
+                                     where(documentId(),'in', ids.slice(i, i+30))));
     snap.forEach(d=>{ avail[d.id] = (d.data().n)||0; });
-    묶음.forEach(d=>availLoaded.add(d));
   }
+  /* 아직 아무도 예약하지 않은 칸은 문서가 아예 없습니다.
+     그때는 0 으로 둡니다 — 없는 것과 0 은 같은 뜻입니다. */
+  ids.forEach(k=>{ if(avail[k] === undefined) avail[k] = 0; });
+  days.forEach(d=>availLoaded.add(d));
 }
 
 /* 그 날짜가 통째로 마감인가 —
@@ -420,7 +445,21 @@ async function syncPub(){
   if(!db || !fbm) return;
   if(Date.now() - lastSync < 8000) return;   // 조회 수를 아끼려고 8초에 한 번까지만
   lastSync = Date.now();
-  const sig = p => JSON.stringify({ d:(p&&p.days)||[], s:(p&&p.slots)||{}, o:!!(p&&p.bookingOpen) });
+  /* ⚠ 「바뀌었는가」를 가리는 지문.
+       그냥 JSON.stringify 로 만들면 안 됩니다 — 서버가 돌려주는 항목의 순서가
+       읽을 때마다 달라져서, 내용이 똑같은데도 매번 「바뀌었다」로 나옵니다.
+       그러면 화면으로 돌아올 때마다 시간표 전체를 헛되이 다시 읽습니다
+       (실제로 자리 수를 두 번씩 읽고 있었습니다 — 26개면 될 것을 53개).
+     열쇠를 이름순으로 맞춰 순서와 무관한 지문을 만듭니다. */
+  const 정렬 = v => {
+    if(Array.isArray(v)) return v.map(정렬);
+    if(v && typeof v === 'object' && !(v instanceof Date)){
+      const o = {}; Object.keys(v).sort().forEach(k=>{ o[k] = 정렬(v[k]); });
+      return o;
+    }
+    return v;
+  };
+  const sig = p => JSON.stringify(정렬({ d:(p&&p.days)||[], s:(p&&p.slots)||{}, o:!!(p&&p.bookingOpen) }));
   const before = sig(pub);
   await refreshPub();
   const 시간표바뀜 = sig(pub) !== before;
